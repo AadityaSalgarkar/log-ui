@@ -21,7 +21,7 @@ export default function ViewPage() {
     queryFn: () => api.view(project, viewId, { runs: selected, metric: state.metric, point: state.point }),
     enabled: selected.length > 0 && !!viewId,
     placeholderData: keepPreviousData,
-    refetchInterval: state.live && anyRunning ? 10_000 : false,
+    refetchInterval: anyRunning ? 10_000 : false,
   })
   const metric = q.data?.metric ?? state.metric ?? spec?.default_metric ?? null
   const metricLabel = spec?.metrics.find((m) => m.id === metric)?.label ?? metric ?? undefined

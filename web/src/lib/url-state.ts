@@ -7,7 +7,6 @@ export interface WsState {
   smoothing: number
   logy: boolean
   maxPoints: number
-  live: boolean
   q: string
   metric: string | null
   point: "last" | "best"
@@ -19,7 +18,6 @@ export const DEFAULTS: WsState = {
   smoothing: 0,
   logy: false,
   maxPoints: 1000,
-  live: true,
   q: "",
   metric: null,
   point: "last",
@@ -39,7 +37,6 @@ export function parseState(sp: URLSearchParams): WsState {
     smoothing: Number.isFinite(sm) && sm >= 0 && sm < 1 ? sm : DEFAULTS.smoothing,
     logy: sp.get("logy") === "1",
     maxPoints: Number.isFinite(mp) && mp >= 0 && sp.get("max_points") !== null ? mp : DEFAULTS.maxPoints,
-    live: sp.get("live") !== "0",
     q: sp.get("q") ?? "",
     metric: sp.get("metric"),
     point: point === "best" ? "best" : "last",
@@ -55,7 +52,6 @@ export function stateToParams(state: WsState, base?: URLSearchParams): URLSearch
   set("smoothing", state.smoothing === DEFAULTS.smoothing ? null : String(state.smoothing))
   set("logy", state.logy ? "1" : null)
   set("max_points", state.maxPoints === DEFAULTS.maxPoints ? null : String(state.maxPoints))
-  set("live", state.live ? null : "0")
   set("q", state.q ? state.q : null)
   set("metric", state.metric)
   set("point", state.point === "last" ? null : state.point)

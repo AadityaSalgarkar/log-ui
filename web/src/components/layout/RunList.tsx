@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router"
 import { Search } from "lucide-react"
 
+import { RunSwatch } from "@/components/RunSwatch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -52,11 +53,11 @@ export function RunList({ project, runs, colors, selected, onSelect }: RunListPr
         />
       </div>
       <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-        <span>
+        <span className="font-mono tabular-nums">
           {selected.length}/{runs.length} selected
         </span>
         <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={toggleAll}>
-          {allVisibleSelected ? "None" : "All"}
+          {allVisibleSelected ? "Select none" : "Select all"}
         </Button>
       </div>
       <ul className="min-h-0 flex-1 overflow-y-auto pr-1" role="list">
@@ -66,8 +67,8 @@ export function RunList({ project, runs, colors, selected, onSelect }: RunListPr
             <li
               key={r.name}
               className={cn(
-                "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-sidebar-accent",
-                on ? "" : "opacity-70",
+                "group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-sidebar-accent",
+                on ? "text-foreground" : "text-muted-foreground",
               )}
             >
               <Checkbox
@@ -76,20 +77,18 @@ export function RunList({ project, runs, colors, selected, onSelect }: RunListPr
                 aria-label={`Select ${r.name}`}
                 className="size-3.5"
               />
-              <span
-                className="inline-block size-2.5 shrink-0 rounded-full"
-                style={{ background: runColor(colors, r.name) }}
-                data-testid="run-color"
-              />
+              <RunSwatch color={runColor(colors, r.name)} className={on ? "" : "opacity-40"} />
               <Link
                 to={`/p/${encodeURIComponent(project)}/runs/${encodeURIComponent(r.name)}`}
-                className="min-w-0 flex-1 truncate font-mono text-xs"
+                className="min-w-0 flex-1 truncate font-mono text-xs hover:underline"
                 title={`${r.name} · step ${fmtInt(r.last_step)} · ${timeAgo(r.last_logged_at)}`}
               >
                 {r.name}
               </Link>
               {r.status === "running" && (
-                <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-emerald-500" title="running" />
+                <span className="shrink-0 font-mono text-[10px] text-primary" title="logged within the last few minutes">
+                  running
+                </span>
               )}
             </li>
           )

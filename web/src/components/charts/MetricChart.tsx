@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts"
 
+import { RunSwatch } from "@/components/RunSwatch"
 import { DEFAULT_CHART_SETTINGS, axisDomain, type ChartSettings } from "@/lib/chart-settings"
 import { runColor } from "@/lib/colors"
 import { fmtDuration, fmtNum, fmtTick } from "@/lib/format"
@@ -34,6 +35,8 @@ export interface MetricChartProps {
   order?: string[]
   settings?: ChartSettings // band and axis limits
 }
+
+const TICK = { fontSize: 10, fill: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }
 
 interface TooltipPayloadItem {
   name?: string
@@ -57,13 +60,13 @@ function ChartTooltip({
   const x = typeof label === "number" ? label : Number(label)
   const head = xMode === "step" ? `step ${fmtTick(x)}` : xMode === "relative_time" ? fmtDuration(x) : new Date(x * 1000).toLocaleString()
   return (
-    <div className="rounded-md border bg-popover px-2.5 py-2 text-xs shadow-md">
-      <div className="mb-1 text-muted-foreground">{head}</div>
+    <div className="min-w-44 rounded-md border bg-popover px-2.5 py-2 font-mono text-[11px] shadow-lg">
+      <div className="mb-1.5 border-b pb-1 text-muted-foreground">{head}</div>
       {items.map((p) => (
-        <div key={p.name} className="flex items-center gap-2">
-          <span className="inline-block size-2 rounded-full" style={{ background: p.color }} />
-          <span className="max-w-48 truncate font-mono">{p.name}</span>
-          <span className="ml-auto font-mono tabular-nums">{fmtNum(p.value)}</span>
+        <div key={p.name} className="flex items-center gap-2 leading-5">
+          <RunSwatch color={p.color ?? "currentColor"} />
+          <span className="max-w-48 truncate">{p.name}</span>
+          <span className="ml-auto pl-3 font-medium tabular-nums">{fmtNum(p.value)}</span>
         </div>
       ))}
     </div>
@@ -94,15 +97,16 @@ function MetricChartImpl({
 
   const chart = (
     <ComposedChart width={width} height={width ? height : undefined} data={data} syncId={syncId} margin={{ top: 8, right: 12, bottom: brush ? 4 : 0, left: 0 }}>
-      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+      <CartesianGrid stroke="var(--rule)" strokeOpacity={0.7} vertical={false} />
       <XAxis
         dataKey="x"
         type="number"
         domain={xAxis.domain}
         allowDataOverflow={xAxis.clip}
         tickFormatter={xFmt}
-        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-        stroke="var(--border)"
+        tick={TICK}
+        stroke="var(--rule)"
+        tickLine={false}
         minTickGap={24}
       />
       <YAxis
@@ -110,12 +114,13 @@ function MetricChartImpl({
         domain={yAxis.domain}
         allowDataOverflow={logY || yAxis.clip}
         tickFormatter={fmtTick}
-        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-        stroke="var(--border)"
+        tick={TICK}
+        stroke="var(--rule)"
+        tickLine={false}
         width={52}
       />
       <Tooltip content={<ChartTooltip xMode={xMode} />} isAnimationActive={false} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "2 2" }} />
-      {legend && <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />}
+      {legend && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "var(--font-mono)" }} iconType="plainline" iconSize={14} />}
       {refX !== null && refX !== undefined && <ReferenceLine x={refX} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
       {refY !== null && refY !== undefined && <ReferenceLine y={refY} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
       {settings.band !== "none" &&
@@ -141,8 +146,8 @@ function MetricChartImpl({
           dataKey={run}
           name={run}
           stroke={runColor(colors, run)}
-          strokeWidth={1.5}
-          dot={false}
+          strokeWidth={1.75}
+          dot={data.length <= 2 ? { r: 2.5, strokeWidth: 0, fill: runColor(colors, run) } : false} // lone points would be invisible as lines
           activeDot={{ r: 3 }}
           connectNulls
           isAnimationActive={false}

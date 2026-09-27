@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
 
+import { RunSwatch } from "@/components/RunSwatch"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -81,7 +82,7 @@ export function RunsTable({ project, runs, colors, selected, onSelect, summaryKe
         header: "run",
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            <span className="inline-block size-2.5 rounded-full" style={{ background: runColor(colors, row.original.name) }} />
+            <RunSwatch color={runColor(colors, row.original.name)} />
             <Link to={`/p/${encodeURIComponent(project)}/runs/${encodeURIComponent(row.original.name)}`} className="font-mono hover:underline">
               {row.original.name}
             </Link>

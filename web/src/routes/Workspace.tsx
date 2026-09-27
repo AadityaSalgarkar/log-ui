@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ChevronDown } from "lucide-react"
 
 import { ChartCard } from "@/components/charts/ChartCard"
-import { StatCards, type Stat } from "@/components/StatCards"
 import { WorkspaceControls } from "@/components/WorkspaceControls"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -11,7 +10,6 @@ import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { bandIds } from "@/lib/chart-settings"
-import { fmtInt, fmtNum, splitKey } from "@/lib/format"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
 import type { SeriesMap } from "@/types"
@@ -45,14 +43,18 @@ function usePins(project: string): [Set<string>, (key: string) => void] {
   return [pins, toggle]
 }
 
+const GRID = "grid grid-cols-1 gap-3 pt-3 lg:grid-cols-2 2xl:grid-cols-3"
+
+/** A metric-prefix group: the prefix set large, the key count beside it, a hairline to the edge. */
 function Section({ title, count, defaultOpen, children }: { title: string; count: number; defaultOpen: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 py-1 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground">
-        <ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
-        {title || "(no prefix)"}
-        <span className="font-normal normal-case">{count}</span>
+      <CollapsibleTrigger className="group/section flex w-full items-center gap-3 rounded-md text-left">
+        <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
+        <span className="text-xl font-bold tracking-tight lowercase group-hover/section:text-primary">{title || "ungrouped"}</span>
+        <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
+        <span className="h-px flex-1 bg-rule" />
       </CollapsibleTrigger>
       <CollapsibleContent>{open && children}</CollapsibleContent>
     </Collapsible>
@@ -73,7 +75,7 @@ export default function WorkspacePage() {
       api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
     enabled: selected.length > 0,
     placeholderData: keepPreviousData,
-    refetchInterval: state.live && anyRunning ? 5_000 : false,
+    refetchInterval: anyRunning ? 5_000 : false,
   })
 
   const series: SeriesMap = useMemo(() => metricsQ.data?.series ?? {}, [metricsQ.data])
@@ -89,28 +91,14 @@ export default function WorkspacePage() {
     return names
   }, [groups])
 
-  const stats: Stat[] = useMemo(() => {
-    const sel = runs.filter((r) => selected.includes(r.name))
-    const latest = Math.max(0, ...sel.map((r) => r.last_step ?? 0))
-    const tps = sel.map((r) => r.summary["train/tokens_per_s"]).filter((v): v is number => typeof v === "number")
-    const running = sel.filter((r) => r.status === "running").length
-    const firstPinned = [...pins][0]
-    const best = firstPinned ? Math.min(...sel.map((r) => r.summary[firstPinned] ?? Infinity)) : null
-    return [
-      { label: "selected runs", value: String(sel.length), hint: `${running} running` },
-      { label: "latest step", value: fmtInt(latest) },
-      { label: "tokens / s", value: tps.length ? fmtNum(Math.max(...tps), 3) : "-", hint: tps.length ? "max over selected" : "log train/tokens_per_s" },
-      { label: firstPinned ? `best ${splitKey(firstPinned)[1]}` : "best (pin a key)", value: best !== null && Number.isFinite(best) ? fmtNum(best) : "-" },
-    ]
-  }, [runs, selected, pins])
-
-  const card = (key: string) => {
+  const card = (key: string, hidePrefix: boolean) => {
     const per: Record<string, { x: number[]; y: number[] } | undefined> = {}
     for (const run of selected) per[run] = series[run]?.[key]
     return (
       <ChartCard
         key={key}
         title={key}
+        hidePrefix={hidePrefix}
         series={per}
         colors={colors}
         order={selected}
@@ -127,31 +115,30 @@ export default function WorkspacePage() {
 
   return (
     <>
-      <StatCards stats={stats} />
       <WorkspaceControls state={state} update={update} />
       {selected.length === 0 ? (
         <p className="text-sm text-muted-foreground">Select runs in the sidebar to plot their metrics.</p>
       ) : metricsQ.isPending || (isLoading && keys.length === 0) ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className={GRID}>
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-60" />
+            <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
         </div>
       ) : metricsQ.isError ? (
-        <p className="text-sm text-destructive">{(metricsQ.error as Error).message}</p>
+        <p className="text-sm text-destructive">Could not load metrics: {(metricsQ.error as Error).message}</p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           {pins.size > 0 && (
             <Section title="pinned" count={pins.size} defaultOpen>
-              <div className="grid grid-cols-1 gap-4 py-2 lg:grid-cols-2 2xl:grid-cols-3">{[...pins].filter((k) => keys.includes(k)).map(card)}</div>
+              <div className={GRID}>{[...pins].filter((k) => keys.includes(k)).map((k) => card(k, false))}</div>
             </Section>
           )}
           {orderedGroups.map((g, i) => (
             <Section key={g} title={g} count={groups.get(g)!.length} defaultOpen={i < 2}>
-              <div className="grid grid-cols-1 gap-4 py-2 lg:grid-cols-2 2xl:grid-cols-3">{groups.get(g)!.map(card)}</div>
+              <div className={GRID}>{groups.get(g)!.map((k) => card(k, g !== ""))}</div>
             </Section>
           ))}
-          {keys.length === 0 && <p className="text-sm text-muted-foreground">No metrics logged yet for the selected runs.</p>}
+          {keys.length === 0 && <p className="text-sm text-muted-foreground">The selected runs have not logged any metrics yet.</p>}
         </div>
       )}
     </>

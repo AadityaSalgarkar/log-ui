@@ -4,6 +4,7 @@ import { Maximize2, Pin, PinOff, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { MetricKey } from "@/components/MetricKey"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
 import { MetricChart, type MetricChartProps } from "@/components/charts/MetricChart"
 import { DEFAULT_CHART_SETTINGS, isDefault, type ChartSettings } from "@/lib/chart-settings"
@@ -16,12 +17,13 @@ export interface ChartCardProps extends Omit<MetricChartProps, "height" | "brush
   onPin?: () => void
   onSettingsChange?: (next: ChartSettings) => void // settings are read-only without it
   bands?: boolean // offer band modes (needs band data from the API)
+  hidePrefix?: boolean // drop the key's first segment when a group header already shows it
   className?: string
 }
 
 const BAND_LABEL = { none: "", std: "mean ± std", minmax: "min – max" } as const
 
-function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, className, ...chart }: ChartCardProps) {
+function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hidePrefix = false, className, ...chart }: ChartCardProps) {
   const [open, setOpen] = useState(false)
   const settings = chart.settings ?? DEFAULT_CHART_SETTINGS
   const windowSize = Object.values(chart.series).find((s) => s?.band)?.band?.window ?? null
@@ -29,13 +31,11 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
   const note = settings.band !== "none" ? `${BAND_LABEL[settings.band]}${windowSize ? ` · ${windowSize}-pt windows` : ""}` : ""
 
   return (
-    <div className={cn("group relative flex flex-col rounded-xl border bg-card p-3 shadow-xs", className)}>
-      <div className="mb-1 flex items-center gap-1">
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-xs font-medium" title={title}>
-            {title}
-          </div>
-          {(subtitle || note) && <div className="truncate text-[10px] text-muted-foreground">{[subtitle, note].filter(Boolean).join(" · ")}</div>}
+    <div className={cn("group relative flex flex-col rounded-lg border bg-card px-3 pt-2.5 pb-2 transition-colors hover:border-input", className)}>
+      <div className="mb-1.5 flex min-h-6 items-center gap-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <MetricKey name={title} hidePrefix={hidePrefix} className="text-[13px]" />
+          {(subtitle || note) && <div className="truncate font-mono text-[10px] text-muted-foreground">{[subtitle, note].filter(Boolean).join(" · ")}</div>}
         </div>
         {onPin && (
           <Button variant="ghost" size="icon" className={cn("size-6 opacity-0 group-hover:opacity-100", pinned && "opacity-100")} onClick={onPin} title={pinned ? "Unpin" : "Pin"}>
@@ -68,7 +68,9 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[min(1200px,92vw)] sm:max-w-[min(1200px,92vw)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-sm">{title}</DialogTitle>
+            <DialogTitle>
+              <MetricKey name={title} className="text-sm" />
+            </DialogTitle>
             {subtitle && <DialogDescription>{subtitle}</DialogDescription>}
           </DialogHeader>
           {open && <MetricChart {...chart} height={520} legend brush />}

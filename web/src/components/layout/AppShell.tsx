@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { Link, Outlet, useLocation, useParams } from "react-router"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronsUpDown, LayoutDashboard, Table2, Layers, Activity } from "lucide-react"
+import { ChevronsUpDown, LayoutDashboard, Table2, Layers } from "lucide-react"
 
 import {
   Sidebar,
@@ -42,7 +42,7 @@ export function AppShell() {
   const runsQ = useQuery({
     queryKey: ["runs", project],
     queryFn: ({ signal }) => api.runs(project, signal),
-    refetchInterval: state.live ? 5_000 : false,
+    refetchInterval: (q) => (q.state.data?.some((r) => r.status === "running") ? 5_000 : 30_000),
     enabled: !!project,
   })
   const viewsQ = useQuery({ queryKey: ["views", project], queryFn: () => api.views(project), enabled: !!project, staleTime: 60_000 })
@@ -76,19 +76,16 @@ export function AppShell() {
   return (
     <ProjectContext.Provider value={ctx}>
       <SidebarProvider>
-        <Sidebar variant="inset" collapsible="offcanvas">
+        <Sidebar variant="sidebar" collapsible="offcanvas">
           <SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-                      <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                        <Activity className="size-4" />
-                      </div>
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold">{project}</span>
-                        <span className="truncate text-xs text-muted-foreground">
+                    <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" aria-label="Switch project">
+                      <div className="grid flex-1 text-left leading-tight">
+                        <span className="truncate text-base font-bold tracking-tight">{project}</span>
+                        <span className="truncate font-mono text-[11px] text-muted-foreground">
                           {runs.length} runs · {runs.filter((r) => r.status === "running").length} running
                         </span>
                       </div>
@@ -150,27 +147,29 @@ export function AppShell() {
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
-            <div className="px-2 text-[10px] text-muted-foreground">
+            <div className="truncate px-2 font-mono text-[10px] text-muted-foreground" title={healthQ.data?.store_dir}>
               log-ui {healthQ.data?.version ?? ""} · {healthQ.data?.store_dir ?? ""}
             </div>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset className="min-w-0">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 md:px-6">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
-            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-              Projects
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <Link to={base} className="text-sm font-medium">
-              {project}
-            </Link>
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 font-mono text-xs">
+              <Link to="/" className="text-muted-foreground hover:text-foreground">
+                projects
+              </Link>
+              <span className="text-muted-foreground/50">/</span>
+              <Link to={`${base}${search}`} className="truncate font-semibold">
+                {project}
+              </Link>
+            </nav>
             <div className="ml-auto flex items-center gap-1">
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex min-w-0 flex-1 flex-col gap-4 p-4 md:p-6">
+          <main className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-5 pb-10 md:px-6">
             <Outlet />
           </main>
         </SidebarInset>

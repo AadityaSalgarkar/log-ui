@@ -3,6 +3,7 @@ import { useParams } from "react-router"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { ChartCard } from "@/components/charts/ChartCard"
+import { RunSwatch } from "@/components/RunSwatch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -51,13 +52,13 @@ export default function RunPage() {
     const ids = bandIds(chartSettings, Object.keys(chartSettings))
     return [ids.filter((id) => !id.startsWith(SYS)), ids.filter((id) => id.startsWith(SYS)).map((id) => id.slice(SYS.length))]
   }, [chartSettings])
-  const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: state.live ? 5_000 : false })
+  const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: (q) => (q.state.data?.status === "running" ? 5_000 : false) })
   const metrics = useQuery({
     queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bandKeys],
     queryFn: ({ signal }) =>
       api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
     placeholderData: keepPreviousData,
-    refetchInterval: state.live && detail.data?.status === "running" ? 5_000 : false,
+    refetchInterval: detail.data?.status === "running" ? 5_000 : false,
   })
   const system = useQuery({
     queryKey: ["system", project, run, sysBandKeys],
@@ -77,7 +78,7 @@ export default function RunPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="inline-block size-3 rounded-full" style={{ background: colors[run] }} />
+        <RunSwatch color={colors[run] ?? "currentColor"} className="h-1 w-5" />
         <h1 className="font-mono text-lg font-semibold">{run}</h1>
         <Badge variant={d.status === "running" ? "default" : "secondary"}>{d.status}</Badge>
         <span className="text-xs text-muted-foreground">
@@ -91,13 +92,17 @@ export default function RunPage() {
           <TabsTrigger value="summary">Summary</TabsTrigger>
           {d.system_keys.length > 0 && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
-        <TabsContent value="charts" className="flex flex-col gap-4">
+        <TabsContent value="charts" className="flex flex-col gap-6 pt-2">
           {[...groups.entries()].map(([g, keys]) => (
             <div key={g}>
-              <div className="py-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{g || "(no prefix)"}</div>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              <div className="flex items-center gap-3 pb-3">
+                <span className="text-xl font-bold tracking-tight lowercase">{g || "ungrouped"}</span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">{keys.length}</span>
+                <span className="h-px flex-1 bg-rule" />
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {keys.map((k) => (
-                  <ChartCard key={k} title={k} series={{ [run]: series[k] }} colors={colors} order={[run]} xMode={state.x} logY={state.logy} syncId={`run-${run}`} {...chartProps(k)} />
+                  <ChartCard key={k} title={k} hidePrefix={g !== ""} series={{ [run]: series[k] }} colors={colors} order={[run]} xMode={state.x} logY={state.logy} syncId={`run-${run}`} {...chartProps(k)} />
                 ))}
               </div>
             </div>

@@ -108,7 +108,7 @@ describe("chart settings", () => {
 
 describe("url state", () => {
   it("round-trips non-default values and keeps other params", () => {
-    const state = { ...DEFAULTS, runs: ["a", "b"], x: "relative_time" as const, smoothing: 0.6, logy: true, live: false, metric: "bpb", point: "best" as const }
+    const state = { ...DEFAULTS, runs: ["a", "b"], x: "relative_time" as const, smoothing: 0.6, logy: true, metric: "bpb", point: "best" as const }
     const sp = stateToParams(state, new URLSearchParams("foo=1"))
     expect(sp.get("foo")).toBe("1")
     expect(sp.get("runs")).toBe("a,b")
