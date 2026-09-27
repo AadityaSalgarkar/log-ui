@@ -60,6 +60,16 @@ def test_keys_and_metrics(client):
     assert inc["series"] == {} or all(not v for v in inc["series"].values())
 
 
+def test_metrics_bands(client):
+    params = {"runs": "run-a", "keys": "train/loss,train/lr", "max_points": 5, "band_keys": "train/loss"}
+    m = client.get(f"/api/projects/{PROJECT}/metrics", params=params).json()["series"]["run-a"]
+    assert "band" not in m["train/lr"]
+    band = m["train/loss"]["band"]
+    assert band["window"] == 10 and len(band["x"]) == 5
+    assert all(lo <= mu <= hi for lo, mu, hi in zip(band["min"], band["mean"], band["max"]))
+    assert all(s > 0 for s in band["std"])  # a decaying loss varies within each 10-step window
+
+
 def test_system_empty(client):
     s = client.get(f"/api/projects/{PROJECT}/system", params={"runs": "run-a"}).json()
     assert s["series"] == {}

@@ -81,6 +81,7 @@ def metrics(
     smoothing: float = Query(0.0, ge=0.0, lt=1.0),
     max_points: int | None = Query(None, ge=0),
     since_id: int = Query(0, ge=0),
+    band_keys: str | None = Query(None, description="keys that also get per-window mean/std/min/max"),
 ):
     store = _project(request, project)
     if x not in X_MODES:
@@ -92,11 +93,18 @@ def metrics(
     created = {r.name: r.created_epoch for r in store.runs(project)}
     series = build_series(rows)
     last_id = max((r[0] for r in rows), default=since_id)
-    return {"x": x, "smoothing": smoothing, "last_id": last_id, "series": payloads(series, key_list, x, smoothing, mp, created)}
+    out = payloads(series, key_list, x, smoothing, mp, created, _csv(band_keys))
+    return {"x": x, "smoothing": smoothing, "last_id": last_id, "series": out}
 
 
 @router.get("/projects/{project}/system")
-def system(request: Request, project: str, runs: str | None = None, max_points: int | None = Query(None, ge=0)):
+def system(
+    request: Request,
+    project: str,
+    runs: str | None = None,
+    max_points: int | None = Query(None, ge=0),
+    band_keys: str | None = None,
+):
     store = _project(request, project)
     rows = store.system_rows(project, _csv(runs))
     created = {r.name: r.created_epoch for r in store.runs(project)}
@@ -105,7 +113,7 @@ def system(request: Request, project: str, runs: str | None = None, max_points: 
     for per_key in series.values():  # system rows have no step; index them by order
         for s in per_key.values():
             s.steps = list(range(len(s.values)))
-    return {"x": "relative_time", "series": payloads(series, None, "relative_time", 0.0, mp, created)}
+    return {"x": "relative_time", "series": payloads(series, None, "relative_time", 0.0, mp, created, _csv(band_keys))}
 
 
 @router.get("/projects/{project}/views")

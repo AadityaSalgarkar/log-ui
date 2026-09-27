@@ -1,6 +1,6 @@
 import numpy as np
 
-from log_ui.series import Series, build_series, downsample_indices, payloads, smooth, to_payload
+from log_ui.series import Series, build_series, downsample_indices, payloads, smooth, to_payload, window_bands
 
 
 def test_build_series_merges_steps_and_drops_none():
@@ -37,6 +37,33 @@ def test_downsample_keeps_extremes_and_bounds():
     assert int(np.argmin(y)) in idx and int(np.argmax(y)) in idx
     assert np.array_equal(downsample_indices(y, 0), np.arange(len(y)))
     assert np.array_equal(downsample_indices(y[:50], 100), np.arange(50))
+
+
+def test_window_bands_match_numpy_per_window():
+    rng = np.random.default_rng(1)
+    y = rng.normal(size=103)
+    x = np.arange(103, dtype=np.float64) * 10
+    b = window_bands(x, y, 10)
+    edges = np.linspace(0, 103, 11).astype(int)
+    windows = [y[a:z] for a, z in zip(edges[:-1], edges[1:])]
+    assert b["window"] == 11 and len(b["x"]) == 10
+    assert np.allclose(b["mean"], [w.mean() for w in windows])
+    assert np.allclose(b["std"], [w.std() for w in windows])
+    assert np.allclose(b["min"], [w.min() for w in windows]) and np.allclose(b["max"], [w.max() for w in windows])
+    assert all(x[a] <= bx <= x[z - 1] for bx, a, z in zip(b["x"], edges[:-1], edges[1:]))
+    one = window_bands(x[:5], y[:5], 0)  # max_points=0: one point per window, zero spread
+    assert one["window"] == 1 and np.allclose(one["std"], 0) and np.allclose(one["min"], y[:5])
+    assert window_bands(x[:0], y[:0], 10)["x"] == []
+
+
+def test_payload_band_uses_raw_values():
+    s = Series(steps=[1, 2, 3, 4], values=[0.0, 2.0, 4.0, 6.0], ts=[0.0, 1.0, 2.0, 3.0])
+    p = to_payload(s, "step", 0.9, 2, 0.0, band=True)
+    assert p["band"]["x"] == [1, 3] and p["band"]["mean"] == [1.0, 5.0] and p["band"]["std"] == [1.0, 1.0]
+    assert p["band"]["min"] == [0.0, 4.0] and p["band"]["max"] == [2.0, 6.0] and p["band"]["window"] == 2
+    assert "band" not in to_payload(s, "step", 0.0, 2, 0.0)
+    out = payloads({"r": {"a": s, "b": s}}, None, "step", 0.0, 2, {}, band_keys=["b"])
+    assert "band" not in out["r"]["a"] and "band" in out["r"]["b"]
 
 
 def test_payload_axes():

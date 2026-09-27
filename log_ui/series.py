@@ -90,16 +90,56 @@ def x_values(s: Series, mode: str, created_epoch: float) -> np.ndarray:
     return np.asarray(s.steps, dtype=np.float64)
 
 
-def to_payload(s: Series, mode: str, smoothing: float, max_points: int, created_epoch: float) -> dict:
+def window_bands(x: np.ndarray, y: np.ndarray, max_points: int) -> dict:
+    """Spread of raw values within each window, the same windows the `max_points` setting implies.
+
+    The series is cut into min(n, max_points) consecutive windows of near-equal size (max_points=0 means one
+    point per window). Each window reports its middle x and the mean, population std, min and max of its values.
+    """
+    n = y.size
+    n_windows = n if max_points <= 0 else min(n, max_points)
+    if n_windows == 0:
+        return {"x": [], "mean": [], "std": [], "min": [], "max": [], "window": 0}
+    edges = np.linspace(0, n, n_windows + 1).astype(int)
+    starts, stops = edges[:-1], edges[1:]
+    mids = (starts + stops - 1) // 2
+    sums = np.add.reduceat(y, starts)
+    counts = stops - starts
+    mean = sums / counts
+    sq = np.add.reduceat((y - np.repeat(mean, counts)) ** 2, starts)
+    return {
+        "x": x[mids],
+        "mean": mean,
+        "std": np.sqrt(sq / counts),
+        "min": np.minimum.reduceat(y, starts),
+        "max": np.maximum.reduceat(y, starts),
+        "window": int(np.ceil(n / n_windows)),
+    }
+
+
+def _x_list(x: np.ndarray, mode: str) -> list:
+    return [int(v) for v in x] if mode == "step" else [round(float(v), 3) for v in x]
+
+
+def _y_list(y: np.ndarray) -> list[float]:
+    return [round(float(v), 6) for v in y]
+
+
+def to_payload(
+    s: Series, mode: str, smoothing: float, max_points: int, created_epoch: float, band: bool = False
+) -> dict:
     x = x_values(s, mode, created_epoch)
     y = smooth(s.values, smoothing)
     idx = downsample_indices(y, max_points)
-    x_out = x[idx]
-    if mode == "step":
-        x_list = [int(v) for v in x_out]
-    else:
-        x_list = [round(float(v), 3) for v in x_out]
-    return {"x": x_list, "y": [round(float(v), 6) for v in y[idx]]}
+    out: dict = {"x": _x_list(x[idx], mode), "y": _y_list(y[idx])}
+    if band:
+        b = window_bands(x, np.asarray(s.values, dtype=np.float64), max_points)
+        out["band"] = {
+            "x": _x_list(b["x"], mode),
+            **{k: _y_list(b[k]) for k in ("mean", "std", "min", "max")},
+            "window": b["window"],
+        }
+    return out
 
 
 def payloads(
@@ -109,9 +149,15 @@ def payloads(
     smoothing: float,
     max_points: int,
     created: dict[str, float],
+    band_keys: list[str] | None = None,
 ) -> dict[str, dict[str, dict]]:
+    """Chart payloads per run and key; keys in `band_keys` also carry their window bands."""
+    bands = set(band_keys or ())
     out: dict[str, dict[str, dict]] = {}
     for run, per_key in series.items():
         selected = per_key if keys is None else {k: per_key[k] for k in keys if k in per_key}
-        out[run] = {k: to_payload(s, mode, smoothing, max_points, created.get(run, 0.0)) for k, s in selected.items()}
+        out[run] = {
+            k: to_payload(s, mode, smoothing, max_points, created.get(run, 0.0), band=k in bands)
+            for k, s in selected.items()
+        }
     return out
