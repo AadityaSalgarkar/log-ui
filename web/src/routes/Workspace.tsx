@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { bandIds } from "@/lib/chart-settings"
+import { bandKeysByEndpoint } from "@/lib/chart-settings"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
 import type { SeriesMap } from "@/types"
@@ -66,7 +66,7 @@ export default function WorkspacePage() {
   const [state, update] = useUrlState()
   const [pins, togglePin] = usePins(project)
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const bandKeys = useMemo(() => bandIds(chartSettings, Object.keys(chartSettings)), [chartSettings])
+  const bandKeys = useMemo(() => bandKeysByEndpoint(chartSettings).metrics, [chartSettings])
 
   const anyRunning = runs.some((r) => selected.includes(r.name) && r.status === "running")
   const metricsQ = useQuery({

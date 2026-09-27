@@ -26,9 +26,13 @@ const BAND_LABEL = { none: "", std: "mean ± std", minmax: "min – max" } as co
 function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hidePrefix = false, className, ...chart }: ChartCardProps) {
   const [open, setOpen] = useState(false)
   const settings = chart.settings ?? DEFAULT_CHART_SETTINGS
-  const windowSize = Object.values(chart.series).find((s) => s?.band)?.band?.window ?? null
+  // Runs of different lengths get different window sizes; report the range rather than one run's.
+  const windows = Object.values(chart.series).flatMap((s) => (s?.band ? [s.band.window] : []))
+  const [wMin, wMax] = windows.length ? [Math.min(...windows), Math.max(...windows)] : [null, null]
+  const windowSize = wMax
+  const windowText = wMin === null ? "" : wMin === wMax ? `${wMin}-pt windows` : `${wMin}–${wMax}-pt windows`
   const customized = !isDefault(settings)
-  const note = settings.band !== "none" ? `${BAND_LABEL[settings.band]}${windowSize ? ` · ${windowSize}-pt windows` : ""}` : ""
+  const note = settings.band !== "none" ? [BAND_LABEL[settings.band], windowText].filter(Boolean).join(" · ") : ""
 
   return (
     <div className={cn("group relative flex flex-col rounded-lg border bg-card px-3 pt-2.5 pb-2 transition-colors hover:border-input", className)}>

@@ -64,3 +64,16 @@ export function axisDomain(lo: number | null, hi: number | null, fallback: [Axis
 export function bandIds(map: ChartSettingsMap, ids: string[]): string[] {
   return ids.filter((id) => (map[id]?.band ?? "none") !== "none").sort()
 }
+
+/** Settings ids: metric charts use the bare key; system and view charts are namespaced. */
+export const SYSTEM_ID = "system:"
+export const VIEW_ID = "view:"
+
+/** Metric keys (and system keys) that need bands, split by the endpoint that serves them. */
+export function bandKeysByEndpoint(map: ChartSettingsMap): { metrics: string[]; system: string[] } {
+  const ids = bandIds(map, Object.keys(map))
+  return {
+    metrics: ids.filter((id) => !id.startsWith(SYSTEM_ID) && !id.startsWith(VIEW_ID)),
+    system: ids.filter((id) => id.startsWith(SYSTEM_ID)).map((id) => id.slice(SYSTEM_ID.length)),
+  }
+}

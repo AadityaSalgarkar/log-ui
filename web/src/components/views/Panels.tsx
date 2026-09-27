@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { fmtInt, fmtNum } from "@/lib/format"
+import { VIEW_ID } from "@/lib/chart-settings"
 import { useProject } from "@/lib/project-context"
 import type { LinesPanel, Panel, ValuePanel } from "@/types"
 
@@ -83,7 +84,7 @@ function Lines({ panel, colors, order }: { panel: LinesPanel; colors: Record<str
       {panel.keys.map((key, i) => {
         const series: Record<string, { x: number[]; y: number[] } | undefined> = {}
         for (const run of order) series[run] = panel.series[run]?.[key]
-        const id = `view:${key}`
+        const id = `${VIEW_ID}${key}`
         return (
           <ChartCard
             key={key}

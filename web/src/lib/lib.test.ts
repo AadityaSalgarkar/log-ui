@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
-import { DEFAULT_CHART_SETTINGS, bandIds, isDefault, parseChartSettings } from "./chart-settings"
+import { DEFAULT_CHART_SETTINGS, bandIds, bandKeysByEndpoint, isDefault, parseChartSettings } from "./chart-settings"
 import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
 import { DEFAULTS, parseState, stateToParams } from "./url-state"
 
@@ -77,6 +77,15 @@ describe("series", () => {
     expect(rows[1][bandField("a")]).toEqual([3, 5])
     const allNegative = mergeSeries({ a: { x: [1], y: [1], band: { ...band, x: [1], mean: [-5], std: [1] } } }, true, "std")
     expect(allNegative[0][bandField("a")]).toBeUndefined()
+  })
+  it("groups multi-level keys by their first segment only", () => {
+    const g = groupKeys(["train/loss/total", "train/loss/aux", "train/lr", "val/x/bpb"])
+    expect(g.get("train")).toEqual(["train/loss/aux", "train/loss/total", "train/lr"])
+    expect(g.get("val")).toEqual(["val/x/bpb"])
+  })
+  it("sends only metric keys for bands, system keys to their own endpoint", () => {
+    const m = parseChartSettings(JSON.stringify({ "train/loss": { band: "std" }, "system:gpu": { band: "minmax" }, "view:val/x": { band: "std" }, lr: { yMin: 0 } }))
+    expect(bandKeysByEndpoint(m)).toEqual({ metrics: ["train/loss"], system: ["gpu"] })
   })
   it("groups keys by prefix", () => {
     const g = groupKeys(["val/x/bpb", "train/loss", "loss", "train/lr"])

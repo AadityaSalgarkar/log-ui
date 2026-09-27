@@ -57,13 +57,22 @@ export function RunsTable({ project, runs, colors, selected, onSelect, summaryKe
       {
         id: "select",
         enableSorting: false,
-        header: () => (
-          <Checkbox
-            checked={runs.length > 0 && runs.every((r) => sel.has(r.name))}
-            onCheckedChange={(v) => onSelect(v === true ? runs.map((r) => r.name) : [])}
-            aria-label="Select all"
-          />
-        ),
+        header: ({ table }) => {
+          // Acts on the rows the filter shows; selections hidden by the filter are kept as they are.
+          const shown = table.getFilteredRowModel().rows.map((r) => r.original.name)
+          const allShown = shown.length > 0 && shown.every((n) => sel.has(n))
+          return (
+            <Checkbox
+              checked={allShown}
+              onCheckedChange={(v) => {
+                const next = new Set(sel)
+                for (const n of shown) v === true ? next.add(n) : next.delete(n)
+                onSelect(runs.map((r) => r.name).filter((n) => next.has(n)))
+              }}
+              aria-label="Select all shown runs"
+            />
+          )
+        },
         cell: ({ row }) => (
           <Checkbox
             checked={sel.has(row.original.name)}

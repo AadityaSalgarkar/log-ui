@@ -4,7 +4,9 @@ import { MemoryRouter } from "react-router"
 import { describe, expect, it, vi } from "vitest"
 
 import { LadderChart } from "@/components/charts/LadderChart"
+import { ChartCard } from "@/components/charts/ChartCard"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
+import { MetricKey } from "@/components/MetricKey"
 import { MetricChart } from "@/components/charts/MetricChart"
 import { DEFAULT_CHART_SETTINGS, axisDomain, parseLimit } from "@/lib/chart-settings"
 import { cellColor } from "@/components/charts/Heatmap"
@@ -50,6 +52,17 @@ describe("RunsTable", () => {
     expect(onSelect).toHaveBeenCalledWith(["alpha", "gamma"])
     await userEvent.type(screen.getByLabelText("Filter runs table"), "gam")
     expect(screen.getAllByRole("row").slice(1)).toHaveLength(1)
+  })
+  it("select-all acts only on the rows the filter shows", async () => {
+    const onSelect = vi.fn()
+    render(
+      <MemoryRouter>
+        <RunsTable project="p" runs={runs} colors={colors} selected={["alpha"]} onSelect={onSelect} />
+      </MemoryRouter>,
+    )
+    await userEvent.type(screen.getByLabelText("Filter runs table"), "gam")
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select all shown runs" }))
+    expect(onSelect).toHaveBeenLastCalledWith(["alpha", "gamma"]) // beta is hidden, so it stays unselected
   })
 })
 
@@ -108,6 +121,18 @@ describe("charts", () => {
     render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={() => {}} bands={false} />)
     expect(screen.queryByRole("radio", { name: "mean ± std" })).not.toBeInTheDocument()
     expect(screen.getByLabelText("x max")).toBeInTheDocument()
+  })
+  it("chart card reports the range of window sizes across runs", () => {
+    const b = (window: number) => ({ x: [1], mean: [1], std: [0], min: [1], max: [1], window })
+    const series = { alpha: { x: [1, 2], y: [1, 2], band: b(4) }, beta: { x: [1, 2], y: [2, 1], band: b(11) } }
+    const settings = { ...DEFAULT_CHART_SETTINGS, band: "minmax" as const }
+    render(<ChartCard title="train/loss/total" hidePrefix series={series} colors={colors} settings={settings} />)
+    expect(screen.getByText("min – max · 4–11-pt windows")).toBeInTheDocument()
+  })
+  it("multi-level keys keep their inner path under the group header", () => {
+    render(<MetricKey name="train/loss/aux" hidePrefix />)
+    expect(screen.getByTitle("train/loss/aux")).toHaveTextContent(/^loss\/aux$/)
+    expect(screen.getByText("aux")).toHaveClass("font-semibold")
   })
   it("heatmap colors diverge around zero", () => {
     expect(cellColor(null, -1, 1, true)).toBe("transparent")

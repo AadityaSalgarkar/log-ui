@@ -12,12 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { bandIds, type ChartSettings } from "@/lib/chart-settings"
+import { SYSTEM_ID, bandKeysByEndpoint, type ChartSettings } from "@/lib/chart-settings"
 import { fmtDate, fmtDuration, fmtInt, fmtNum } from "@/lib/format"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
 
-const SYS = "system:" // chart-settings id prefix for system metric charts
 
 function KeyValueTable({ rows, filter }: { rows: [string, unknown][]; filter: string }) {
   const needle = filter.toLowerCase()
@@ -48,10 +47,7 @@ export default function RunPage() {
   const [state] = useUrlState()
   const [filter, setFilter] = useState("")
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const [bandKeys, sysBandKeys] = useMemo(() => {
-    const ids = bandIds(chartSettings, Object.keys(chartSettings))
-    return [ids.filter((id) => !id.startsWith(SYS)), ids.filter((id) => id.startsWith(SYS)).map((id) => id.slice(SYS.length))]
-  }, [chartSettings])
+  const { metrics: bandKeys, system: sysBandKeys } = useMemo(() => bandKeysByEndpoint(chartSettings), [chartSettings])
   const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: (q) => (q.state.data?.status === "running" ? 5_000 : false) })
   const metrics = useQuery({
     queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bandKeys],
@@ -118,7 +114,7 @@ export default function RunPage() {
         <TabsContent value="system">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {Object.keys(system.data?.series[run] ?? {}).map((k) => (
-              <ChartCard key={k} title={k} series={{ [run]: system.data?.series[run]?.[k] }} colors={colors} order={[run]} xMode="relative_time" {...chartProps(SYS + k)} />
+              <ChartCard key={k} title={k} series={{ [run]: system.data?.series[run]?.[k] }} colors={colors} order={[run]} xMode="relative_time" {...chartProps(SYSTEM_ID + k)} />
             ))}
           </div>
         </TabsContent>
