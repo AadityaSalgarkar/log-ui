@@ -72,7 +72,8 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
         <MetricChart {...chart} height={200} />
       </ErrorBoundary>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[min(1200px,92vw)] sm:max-w-[min(1200px,92vw)]">
+        {/* Fills the viewport (1rem margin), centred; the plot takes all height below the title. */}
+        <DialogContent className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-3 sm:max-w-none">
           <DialogHeader>
             <DialogTitle>
               <MetricKey name={title} className="text-sm" />
@@ -80,9 +81,11 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
             {subtitle && <DialogDescription>{subtitle}</DialogDescription>}
           </DialogHeader>
           {open && (
-            <ErrorBoundary what="this chart" resetKey={chart.settings}>
-              <MetricChart {...chart} height={520} legend brush />
-            </ErrorBoundary>
+            <div className="min-h-0 flex-1">
+              <ErrorBoundary what="this chart" resetKey={chart.settings}>
+                <MetricChart {...chart} height="fill" legend brush />
+              </ErrorBoundary>
+            </div>
           )}
         </DialogContent>
       </Dialog>

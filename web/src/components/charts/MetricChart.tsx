@@ -26,7 +26,7 @@ export interface MetricChartProps {
   xMode?: XMode
   logY?: boolean
   syncId?: string
-  height?: number
+  height?: number | "fill" // "fill": take the parent's full height (the parent must have one)
   width?: number // when given, ResponsiveContainer is bypassed (tests)
   legend?: boolean
   brush?: boolean
@@ -92,7 +92,7 @@ function MetricChartImpl({
   const hover = { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
 
   const chart = (
-    <ComposedChart width={width} height={width ? height : undefined} data={data} syncId={syncId} margin={{ top: 8, right: 12, bottom: brush ? 4 : 0, left: 0 }}>
+    <ComposedChart width={width} height={width && typeof height === "number" ? height : undefined} data={data} syncId={syncId} margin={{ top: 8, right: 12, bottom: brush ? 4 : 0, left: 0 }}>
       <CartesianGrid stroke="var(--rule)" strokeOpacity={0.7} vertical={false} />
       <XAxis
         dataKey="x"
@@ -154,16 +154,17 @@ function MetricChartImpl({
     </ComposedChart>
   )
 
+  const fill = height === "fill"
   if (width) {
     return (
-      <div style={{ width, height }} {...hover}>
+      <div style={{ width, height: fill ? "100%" : height }} {...hover}>
         {chart}
       </div>
     )
   }
   return (
-    <div {...hover}>
-      <ResponsiveContainer width="100%" height={height}>
+    <div className={fill ? "h-full min-h-0" : undefined} {...hover}>
+      <ResponsiveContainer width="100%" height={fill ? "100%" : height}>
         {chart}
       </ResponsiveContainer>
     </div>
