@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { MetricKey } from "@/components/MetricKey"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { MetricChart, type MetricChartProps } from "@/components/charts/MetricChart"
 import { DEFAULT_CHART_SETTINGS, isDefault, type ChartSettings } from "@/lib/chart-settings"
 import { cn } from "@/lib/utils"
@@ -67,7 +68,9 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
           <Maximize2 className="size-3.5" />
         </Button>
       </div>
-      <MetricChart {...chart} height={200} />
+      <ErrorBoundary what="this chart" resetKey={chart.settings} compact>
+        <MetricChart {...chart} height={200} />
+      </ErrorBoundary>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[min(1200px,92vw)] sm:max-w-[min(1200px,92vw)]">
           <DialogHeader>
@@ -76,7 +79,11 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
             </DialogTitle>
             {subtitle && <DialogDescription>{subtitle}</DialogDescription>}
           </DialogHeader>
-          {open && <MetricChart {...chart} height={520} legend brush />}
+          {open && (
+            <ErrorBoundary what="this chart" resetKey={chart.settings}>
+              <MetricChart {...chart} height={520} legend brush />
+            </ErrorBoundary>
+          )}
         </DialogContent>
       </Dialog>
     </div>

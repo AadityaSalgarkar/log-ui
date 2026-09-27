@@ -1,21 +1,26 @@
+// Formatters run inside chart tooltips and axes, where one throw blanks the page; anything non-numeric shows "-".
 export function fmtNum(v: number | null | undefined, digits = 4): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return "-"
+  if (typeof v !== "number" || !Number.isFinite(v)) return "-"
   if (v === 0) return "0"
   const a = Math.abs(v)
   if (a >= 1e6 || a < 1e-4) return v.toExponential(2)
   if (a >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
-  return v.toPrecision(digits).replace(/\.?0+$/, "")
+  return trimZeros(v.toPrecision(digits))
 }
 
 export function fmtInt(v: number | null | undefined): string {
-  if (v === null || v === undefined) return "-"
+  if (typeof v !== "number" || !Number.isFinite(v)) return "-"
   return Math.round(v).toLocaleString()
 }
 
+/** Drop trailing zeros after a decimal point only: "1.50" -> "1.5", "2.00" -> "2", but "140" stays "140". */
+const trimZeros = (s: string) => (s.includes(".") && !s.includes("e") ? s.replace(/0+$/, "").replace(/\.$/, "") : s)
+
 export function fmtTick(v: number): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "-"
   const a = Math.abs(v)
-  if (a >= 1e6) return `${(v / 1e6).toPrecision(3).replace(/\.?0+$/, "")}M`
-  if (a >= 1e3) return `${(v / 1e3).toPrecision(3).replace(/\.?0+$/, "")}k`
+  if (a >= 1e6) return `${trimZeros((v / 1e6).toPrecision(3))}M`
+  if (a >= 1e3) return `${trimZeros((v / 1e3).toPrecision(3))}k`
   if (a > 0 && a < 1e-3) return v.toExponential(1)
   return Number(v.toPrecision(3)).toString()
 }

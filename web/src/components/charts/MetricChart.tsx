@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react"
+import { memo, useMemo, useState } from "react"
 import {
   Area,
   Brush,
@@ -17,7 +17,7 @@ import { RunSwatch } from "@/components/RunSwatch"
 import { DEFAULT_CHART_SETTINGS, axisDomain, type ChartSettings } from "@/lib/chart-settings"
 import { runColor } from "@/lib/colors"
 import { fmtDuration, fmtNum, fmtTick } from "@/lib/format"
-import { bandField, mergeSeries } from "@/lib/series"
+import { bandField, mergeSeries, tooltipItems, type TooltipPayloadItem } from "@/lib/series"
 import type { SeriesXY, XMode } from "@/types"
 
 export interface MetricChartProps {
@@ -38,12 +38,6 @@ export interface MetricChartProps {
 
 const TICK = { fontSize: 10, fill: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }
 
-interface TooltipPayloadItem {
-  name?: string
-  value?: number | null
-  color?: string
-}
-
 function ChartTooltip({
   active,
   payload,
@@ -56,7 +50,7 @@ function ChartTooltip({
   xMode: XMode
 }) {
   if (!active || !payload?.length) return null
-  const items = payload.filter((p) => p.value !== null && p.value !== undefined).sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+  const items = tooltipItems(payload)
   const x = typeof label === "number" ? label : Number(label)
   const head = xMode === "step" ? `step ${fmtTick(x)}` : xMode === "relative_time" ? fmtDuration(x) : new Date(x * 1000).toLocaleString()
   return (
@@ -94,6 +88,8 @@ function MetricChartImpl({
   const xAxis = axisDomain(settings.xMin, settings.xMax, ["dataMin", "dataMax"])
   const yLow = logY && settings.yMin !== null && settings.yMin <= 0 ? null : settings.yMin // log axes need a positive floor
   const yAxis = axisDomain(yLow, settings.yMax, ["auto", "auto"])
+  const [hovered, setHovered] = useState(false)
+  const hover = { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) }
 
   const chart = (
     <ComposedChart width={width} height={width ? height : undefined} data={data} syncId={syncId} margin={{ top: 8, right: 12, bottom: brush ? 4 : 0, left: 0 }}>
@@ -119,7 +115,8 @@ function MetricChartImpl({
         tickLine={false}
         width={52}
       />
-      <Tooltip content={<ChartTooltip xMode={xMode} />} isAnimationActive={false} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "2 2" }} />
+      {/* Synced charts share the cursor line; only the chart under the mouse draws a tooltip. */}
+      <Tooltip content={hovered ? <ChartTooltip xMode={xMode} /> : () => null} isAnimationActive={false} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "2 2" }} />
       {legend && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "var(--font-mono)" }} iconType="plainline" iconSize={14} />}
       {refX !== null && refX !== undefined && <ReferenceLine x={refX} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
       {refY !== null && refY !== undefined && <ReferenceLine y={refY} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
@@ -158,12 +155,18 @@ function MetricChartImpl({
   )
 
   if (width) {
-    return <div style={{ width, height }}>{chart}</div>
+    return (
+      <div style={{ width, height }} {...hover}>
+        {chart}
+      </div>
+    )
   }
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      {chart}
-    </ResponsiveContainer>
+    <div {...hover}>
+      <ResponsiveContainer width="100%" height={height}>
+        {chart}
+      </ResponsiveContainer>
+    </div>
   )
 }
 

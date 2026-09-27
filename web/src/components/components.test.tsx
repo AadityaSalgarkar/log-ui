@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest"
 import { LadderChart } from "@/components/charts/LadderChart"
 import { ChartCard } from "@/components/charts/ChartCard"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { MetricKey } from "@/components/MetricKey"
 import { PointsInput } from "@/components/WorkspaceControls"
 import { MetricChart } from "@/components/charts/MetricChart"
@@ -164,6 +165,22 @@ describe("charts", () => {
     await userEvent.clear(input)
     await userEvent.type(input, "all{Enter}")
     expect(onCommit).toHaveBeenLastCalledWith(0)
+  })
+  it("an error boundary contains a chart that throws, and the rest of the page stays", async () => {
+    const Boom = () => {
+      throw new Error("e.toPrecision is not a function")
+    }
+    render(
+      <div>
+        <p>other charts</p>
+        <ErrorBoundary what="this chart" compact>
+          <Boom />
+        </ErrorBoundary>
+      </div>,
+    )
+    expect(screen.getByText("other charts")).toBeInTheDocument()
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not draw this chart.")
+    expect(screen.getByRole("alert")).toHaveTextContent("e.toPrecision is not a function")
   })
   it("heatmap colors diverge around zero", () => {
     expect(cellColor(null, -1, 1, true)).toBe("transparent")

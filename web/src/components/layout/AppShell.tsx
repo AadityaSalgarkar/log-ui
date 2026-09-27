@@ -31,6 +31,7 @@ import { ProjectContext, type ProjectContextValue } from "@/lib/project-context"
 import { useUrlState } from "@/hooks/use-url-state"
 import { RunList } from "@/components/layout/RunList"
 import { ThemeToggle } from "@/components/layout/ThemeToggle"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 
 const MAX_DEFAULT_SELECTED = 8
 
@@ -170,7 +171,9 @@ export function AppShell() {
             </div>
           </header>
           <main className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-5 pb-10 md:px-6">
-            <Outlet />
+            <ErrorBoundary what="this page" resetKey={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </main>
         </SidebarInset>
       </SidebarProvider>

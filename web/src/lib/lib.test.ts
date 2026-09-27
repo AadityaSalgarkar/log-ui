@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import { PALETTE, colorMap, runColor } from "./colors"
-import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
+import { fmtDuration, fmtInt, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
 import { DEFAULT_CHART_SETTINGS, bandIds, bandRequests, isDefault, parseChartSettings, parseWindow } from "./chart-settings"
-import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
+import { bandField, bandRange, groupKeys, lastValue, mergeSeries, tooltipItems } from "./series"
 import type { RunInfo } from "@/types"
 import { runsRevision } from "./project-context"
 import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
@@ -33,6 +33,23 @@ describe("format", () => {
     expect(fmtNum(1234.5)).toBe("1,235")
     expect(fmtTick(1500)).toBe("1.5k")
     expect(fmtTick(2_000_000)).toBe("2M")
+  })
+  it("keeps zeros that belong to whole numbers in ticks", () => {
+    expect(fmtTick(140e6)).toBe("140M") // was "14M"
+    expect(fmtTick(900e3)).toBe("900k") // was "9k"
+    expect(fmtTick(105e6)).toBe("105M")
+    expect(fmtTick(1.2e6)).toBe("1.2M")
+    expect(fmtTick(2000)).toBe("2k")
+    expect(fmtTick(100)).toBe("100")
+    expect(fmtNum(100)).toBe("100")
+    expect(fmtNum(0.5)).toBe("0.5")
+  })
+  it("never throws on non-numbers (chart tooltips can pass arrays)", () => {
+    for (const bad of [[1, 2], "x", undefined, null, NaN, Infinity] as unknown as number[]) {
+      expect(fmtNum(bad)).toBe("-")
+      expect(fmtTick(bad)).toBe("-")
+      expect(fmtInt(bad)).toBe("-")
+    }
   })
   it("formats durations and ages", () => {
     expect(fmtDuration(5)).toBe("5.0s")
@@ -79,6 +96,15 @@ describe("series", () => {
     expect(rows[1][bandField("a")]).toEqual([3, 5])
     const allNegative = mergeSeries({ a: { x: [1], y: [1], band: { ...band, x: [1], mean: [-5], std: [1] } } }, true, "std")
     expect(allNegative[0][bandField("a")]).toBeUndefined()
+  })
+  it("tooltip keeps run lines and drops band areas (whose value is a [low, high] pair)", () => {
+    const payload = [
+      { name: "a", dataKey: "a", value: 1.5, color: "#111" },
+      { name: bandField("a"), dataKey: bandField("a"), value: [1, 2], color: "#111" },
+      { name: "b", dataKey: "b", value: 2.5, color: "#222" },
+      { name: "c", dataKey: "c", value: null },
+    ]
+    expect(tooltipItems(payload).map((p) => p.name)).toEqual(["b", "a"])
   })
   it("groups multi-level keys by their first segment only", () => {
     const g = groupKeys(["train/loss/total", "train/loss/aux", "train/lr", "val/x/bpb"])

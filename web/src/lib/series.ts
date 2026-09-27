@@ -44,6 +44,25 @@ export function mergeSeries(series: Record<string, SeriesXY | undefined>, logY =
   return [...byX.values()].sort((a, b) => a.x - b.x)
 }
 
+/** What Recharts passes a tooltip per series. `value` is a [low, high] pair for band areas, not a number. */
+export interface TooltipPayloadItem {
+  name?: string
+  dataKey?: unknown
+  value?: unknown
+  color?: string
+}
+
+/**
+ * Run lines only, highest first. Recharts hands band areas to the tooltip despite tooltipType="none", with a
+ * [low, high] pair as the value; those must never reach number formatting.
+ */
+export function tooltipItems(payload: TooltipPayloadItem[]): (TooltipPayloadItem & { value: number })[] {
+  return payload
+    .filter((p): p is TooltipPayloadItem & { value: number } => typeof p.value === "number" && Number.isFinite(p.value))
+    .filter((p) => !String(p.dataKey ?? p.name ?? "").endsWith(bandField("")))
+    .sort((a, b) => b.value - a.value)
+}
+
 /** Group metric keys by their prefix ("train", "val", ...), keys without a prefix under "". */
 export function groupKeys(keys: string[]): Map<string, string[]> {
   const groups = new Map<string, string[]>()
