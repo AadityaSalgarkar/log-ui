@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local trackio stores and scratch
+*.db
+*.db-shm
+*.db-wal
+*.lock
+!uv.lock
+to-delete/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# The built SPA in log_ui/static is committed on purpose (shipped in the wheel); see web/.gitignore for Node.
