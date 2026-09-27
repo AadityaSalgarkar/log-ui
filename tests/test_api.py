@@ -78,13 +78,17 @@ def test_keys_and_metrics(client):
 
 
 def test_metrics_bands(client):
-    params = {"runs": "run-a", "keys": "train/loss,train/lr", "max_points": 5, "band_keys": "train/loss"}
+    params = {"runs": "run-a", "keys": "train/loss,train/lr", "max_points": 0, "bands": "train/loss:5"}
     m = client.get(f"/api/projects/{PROJECT}/metrics", params=params).json()["series"]["run-a"]
     assert "band" not in m["train/lr"]
-    band = m["train/loss"]["band"]
-    assert band["window"] == 10 and len(band["x"]) == 5
+    loss, band = m["train/loss"], m["train/loss"]["band"]
+    assert band["window"] == 5 and band["x"] == loss["x"] and len(band["x"]) == 50  # independent of max_points
     assert all(lo <= mu <= hi for lo, mu, hi in zip(band["min"], band["mean"], band["max"]))
-    assert all(s > 0 for s in band["std"])  # a decaying loss varies within each 10-step window
+    assert all(s > 0 for s in band["std"])  # a decaying loss varies within every 5-step window
+    few = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "max_points": 10}).json()
+    assert few["series"]["run-a"]["train/loss"]["band"]["window"] == 5  # still 5 raw points, not 50 / 10
+    bad = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "bands": "train/loss"})
+    assert bad.status_code == 422 and "key:window" in bad.json()["detail"]
 
 
 def test_system_empty(client):

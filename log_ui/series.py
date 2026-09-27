@@ -90,31 +90,30 @@ def x_values(s: Series, mode: str, created_epoch: float) -> np.ndarray:
     return np.asarray(s.steps, dtype=np.float64)
 
 
-def window_bands(x: np.ndarray, y: np.ndarray, max_points: int) -> dict:
-    """Spread of raw values within each window, the same windows the `max_points` setting implies.
+MAX_BAND_WINDOW = 10_000
+_CHUNK = 4096  # rows of the (points x window) view reduced at a time, bounding memory
 
-    The series is cut into min(n, max_points) consecutive windows of near-equal size (max_points=0 means one
-    point per window). Each window reports its middle x and the mean, population std, min and max of its values.
+
+def rolling_bands(y: np.ndarray, at: np.ndarray, window: int) -> dict[str, np.ndarray]:
+    """Mean, population std, min and max of raw values in a window of `window` points centred on each index in `at`.
+
+    The window around index i spans [i - (window - 1) // 2, i + window // 2], clipped to the series, so edges use
+    fewer points instead of padding. Independent of how many points are plotted.
     """
-    n = y.size
-    n_windows = n if max_points <= 0 else min(n, max_points)
-    if n_windows == 0:
-        return {"x": [], "mean": [], "std": [], "min": [], "max": [], "window": 0}
-    edges = np.linspace(0, n, n_windows + 1).astype(int)
-    starts, stops = edges[:-1], edges[1:]
-    mids = (starts + stops - 1) // 2
-    sums = np.add.reduceat(y, starts)
-    counts = stops - starts
-    mean = sums / counts
-    sq = np.add.reduceat((y - np.repeat(mean, counts)) ** 2, starts)
-    return {
-        "x": x[mids],
-        "mean": mean,
-        "std": np.sqrt(sq / counts),
-        "min": np.minimum.reduceat(y, starts),
-        "max": np.maximum.reduceat(y, starts),
-        "window": int(np.ceil(n / n_windows)),
-    }
+    # Stats come straight from each window's values: running sums of y and y^2 would lose the std of a small
+    # spread on a large offset (e.g. loss 1000.0 +- 0.001) to cancellation.
+    w = max(1, min(window, y.size))
+    pad = np.pad(y, (w, w), constant_values=np.nan)  # NaN edges: clipped windows are exact under nan-reductions
+    view = np.lib.stride_tricks.sliding_window_view(pad, w)
+    starts = at - (w - 1) // 2 + w
+    out = {k: np.empty(at.size) for k in ("mean", "std", "min", "max")}
+    for c in range(0, at.size, _CHUNK):
+        rows, sl = view[starts[c : c + _CHUNK]], slice(c, c + _CHUNK)
+        out["mean"][sl] = np.nanmean(rows, axis=1)
+        out["std"][sl] = np.nanstd(rows, axis=1)
+        out["min"][sl] = np.nanmin(rows, axis=1)
+        out["max"][sl] = np.nanmax(rows, axis=1)
+    return out
 
 
 def _x_list(x: np.ndarray, mode: str) -> list:
@@ -126,19 +125,31 @@ def _y_list(y: np.ndarray) -> list[float]:
 
 
 def to_payload(
-    s: Series, mode: str, smoothing: float, max_points: int, created_epoch: float, band: bool = False
+    s: Series, mode: str, smoothing: float, max_points: int, created_epoch: float, band_window: int | None = None
 ) -> dict:
+    """Plotted {x, y}; with `band_window`, also the raw-value spread in that many points around each plotted point."""
     x = x_values(s, mode, created_epoch)
     y = smooth(s.values, smoothing)
     idx = downsample_indices(y, max_points)
     out: dict = {"x": _x_list(x[idx], mode), "y": _y_list(y[idx])}
-    if band:
-        b = window_bands(x, np.asarray(s.values, dtype=np.float64), max_points)
+    if band_window:
+        b = rolling_bands(np.asarray(s.values, dtype=np.float64), idx, band_window)
         out["band"] = {
-            "x": _x_list(b["x"], mode),
-            **{k: _y_list(b[k]) for k in ("mean", "std", "min", "max")},
-            "window": b["window"],
+            "x": out["x"],
+            **{k: _y_list(v) for k, v in b.items()},
+            "window": min(band_window, len(s)),
         }
+    return out
+
+
+def parse_bands(spec: list[str] | None) -> dict[str, int]:
+    """`key:window` entries -> {key: window}. The last ':' splits, so keys may contain colons."""
+    out: dict[str, int] = {}
+    for item in spec or ():
+        key, sep, w = item.rpartition(":")
+        if not sep or not key or not w.isdigit() or not 1 <= int(w) <= MAX_BAND_WINDOW:
+            raise ValueError(f"band entries must be key:window with 1 <= window <= {MAX_BAND_WINDOW}, got {item!r}")
+        out[key] = int(w)
     return out
 
 
@@ -149,15 +160,15 @@ def payloads(
     smoothing: float,
     max_points: int,
     created: dict[str, float],
-    band_keys: list[str] | None = None,
+    bands: dict[str, int] | None = None,
 ) -> dict[str, dict[str, dict]]:
-    """Chart payloads per run and key; keys in `band_keys` also carry their window bands."""
-    bands = set(band_keys or ())
+    """Chart payloads per run and key; keys in `bands` also carry a rolling band of the given window."""
+    bands = bands or {}
     out: dict[str, dict[str, dict]] = {}
     for run, per_key in series.items():
         selected = per_key if keys is None else {k: per_key[k] for k in keys if k in per_key}
         out[run] = {
-            k: to_payload(s, mode, smoothing, max_points, created.get(run, 0.0), band=k in bands)
+            k: to_payload(s, mode, smoothing, max_points, created.get(run, 0.0), bands.get(k))
             for k, s in selected.items()
         }
     return out

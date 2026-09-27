@@ -1,6 +1,16 @@
 import numpy as np
+import pytest
 
-from log_ui.series import Series, build_series, downsample_indices, payloads, smooth, to_payload, window_bands
+from log_ui.series import (
+    Series,
+    build_series,
+    downsample_indices,
+    parse_bands,
+    payloads,
+    rolling_bands,
+    smooth,
+    to_payload,
+)
 
 
 def test_build_series_merges_steps_and_drops_none():
@@ -39,31 +49,54 @@ def test_downsample_keeps_extremes_and_bounds():
     assert np.array_equal(downsample_indices(y[:50], 100), np.arange(50))
 
 
-def test_window_bands_match_numpy_per_window():
+def _brute_bands(y: np.ndarray, at: np.ndarray, w: int) -> dict[str, list[float]]:
+    wins = [y[max(0, i - (w - 1) // 2) : i + w // 2 + 1] for i in at]
+    return {"mean": [v.mean() for v in wins], "std": [v.std() for v in wins],
+            "min": [v.min() for v in wins], "max": [v.max() for v in wins]}
+
+
+def test_rolling_bands_match_direct_windows_including_edges():
     rng = np.random.default_rng(1)
     y = rng.normal(size=103)
-    x = np.arange(103, dtype=np.float64) * 10
-    b = window_bands(x, y, 10)
-    edges = np.linspace(0, 103, 11).astype(int)
-    windows = [y[a:z] for a, z in zip(edges[:-1], edges[1:])]
-    assert b["window"] == 11 and len(b["x"]) == 10
-    assert np.allclose(b["mean"], [w.mean() for w in windows])
-    assert np.allclose(b["std"], [w.std() for w in windows])
-    assert np.allclose(b["min"], [w.min() for w in windows]) and np.allclose(b["max"], [w.max() for w in windows])
-    assert all(x[a] <= bx <= x[z - 1] for bx, a, z in zip(b["x"], edges[:-1], edges[1:]))
-    one = window_bands(x[:5], y[:5], 0)  # max_points=0: one point per window, zero spread
-    assert one["window"] == 1 and np.allclose(one["std"], 0) and np.allclose(one["min"], y[:5])
-    assert window_bands(x[:0], y[:0], 10)["x"] == []
+    for w in (1, 2, 5, 10, 103, 500):  # even/odd, whole series, larger than the series
+        at = np.array([0, 1, 7, 50, 101, 102])
+        got, want = rolling_bands(y, at, w), _brute_bands(y, at, min(w, 103))
+        for k in want:
+            assert np.allclose(got[k], want[k]), (w, k)
+    flat = rolling_bands(y, np.arange(103), 1)
+    assert np.all(flat["std"] == 0) and np.array_equal(flat["min"], y)
+    offset = rolling_bands(1000.0 + 1e-3 * np.array([1.0, -1.0] * 50), np.array([50]), 10)
+    assert abs(offset["std"][0] - 1e-3) < 1e-9  # no cancellation on a large offset
+    assert rolling_bands(y[:0], np.array([], dtype=int), 10)["mean"].size == 0
 
 
-def test_payload_band_uses_raw_values():
-    s = Series(steps=[1, 2, 3, 4], values=[0.0, 2.0, 4.0, 6.0], ts=[0.0, 1.0, 2.0, 3.0])
-    p = to_payload(s, "step", 0.9, 2, 0.0, band=True)
-    assert p["band"]["x"] == [1, 3] and p["band"]["mean"] == [1.0, 5.0] and p["band"]["std"] == [1.0, 1.0]
-    assert p["band"]["min"] == [0.0, 4.0] and p["band"]["max"] == [2.0, 6.0] and p["band"]["window"] == 2
+def test_rolling_bands_chunking_matches_unchunked():
+    y = np.sin(np.arange(10_000) / 50.0)
+    at = np.arange(0, 10_000, 1)  # more rows than one chunk
+    got = rolling_bands(y, at, 21)
+    want = _brute_bands(y, at[::997], 21)
+    assert np.allclose(got["max"][::997], want["max"]) and np.allclose(got["mean"][::997], want["mean"])
+
+
+def test_payload_band_is_centred_on_plotted_points_and_uses_raw_values():
+    s = Series(steps=[1, 2, 3, 4, 5], values=[0.0, 2.0, 4.0, 6.0, 8.0], ts=[0.0, 1.0, 2.0, 3.0, 4.0])
+    p = to_payload(s, "step", 0.9, 0, 0.0, band_window=3)  # smoothing affects y, not the band
+    assert p["band"]["x"] == p["x"] == [1, 2, 3, 4, 5]
+    assert p["band"]["mean"] == [1.0, 2.0, 4.0, 6.0, 7.0]  # edges use the points that exist
+    assert p["band"]["min"] == [0.0, 0.0, 2.0, 4.0, 6.0] and p["band"]["max"] == [2.0, 4.0, 6.0, 8.0, 8.0]
+    assert p["band"]["window"] == 3
+    assert to_payload(s, "step", 0.0, 0, 0.0, band_window=50)["band"]["window"] == 5  # capped at the run length
     assert "band" not in to_payload(s, "step", 0.0, 2, 0.0)
-    out = payloads({"r": {"a": s, "b": s}}, None, "step", 0.0, 2, {}, band_keys=["b"])
-    assert "band" not in out["r"]["a"] and "band" in out["r"]["b"]
+    out = payloads({"r": {"a": s, "b": s}}, None, "step", 0.0, 0, {}, bands={"b": 2})
+    assert "band" not in out["r"]["a"] and out["r"]["b"]["band"]["window"] == 2
+
+
+def test_parse_bands():
+    assert parse_bands(["train/loss:10", "a:b:3"]) == {"train/loss": 10, "a:b": 3}
+    assert parse_bands(None) == {}
+    for bad in (["train/loss"], ["x:0"], ["x:-1"], ["x:abc"], [":5"], ["x:100001"]):
+        with pytest.raises(ValueError):
+            parse_bands(bad)
 
 
 def test_payload_axes():

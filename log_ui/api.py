@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from log_ui import __version__
 from log_ui.contract import TRACKIO_VERSIONS
-from log_ui.series import X_MODES, build_series, payloads
+from log_ui.series import X_MODES, build_series, parse_bands, payloads
 from log_ui.views import collect_views, resolve_view
 
 router = APIRouter(prefix="/api")
@@ -18,6 +18,13 @@ def _csv(value: str | None) -> list[str] | None:
     if value is None or value == "":
         return None
     return [v for v in value.split(",") if v]
+
+
+def _bands(value: str | None) -> dict[str, int]:
+    try:
+        return parse_bands(_csv(value))
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
 
 
 def _store(request: Request):
@@ -82,7 +89,7 @@ def metrics(
     smoothing: float = Query(0.0, ge=0.0, lt=1.0),
     max_points: int | None = Query(None, ge=0),
     since_id: int = Query(0, ge=0),
-    band_keys: str | None = Query(None, description="keys that also get per-window mean/std/min/max"),
+    bands: str | None = Query(None, description="key:window,... rolling mean/std/min/max over `window` raw points"),
 ):
     store = _project(request, project)
     if x not in X_MODES:
@@ -94,7 +101,7 @@ def metrics(
     created = {r.name: r.created_epoch for r in store.runs(project)}
     series = build_series(rows)
     last_id = max((r[0] for r in rows), default=since_id)
-    out = payloads(series, key_list, x, smoothing, mp, created, _csv(band_keys))
+    out = payloads(series, key_list, x, smoothing, mp, created, _bands(bands))
     return {"x": x, "smoothing": smoothing, "last_id": last_id, "series": out}
 
 
@@ -104,7 +111,7 @@ def system(
     project: str,
     runs: str | None = None,
     max_points: int | None = Query(None, ge=0),
-    band_keys: str | None = None,
+    bands: str | None = None,
 ):
     store = _project(request, project)
     rows = store.system_rows(project, _csv(runs))
@@ -114,7 +121,7 @@ def system(
     for per_key in series.values():  # system rows have no step; index them by order
         for s in per_key.values():
             s.steps = list(range(len(s.values)))
-    return {"x": "relative_time", "series": payloads(series, None, "relative_time", 0.0, mp, created, _csv(band_keys))}
+    return {"x": "relative_time", "series": payloads(series, None, "relative_time", 0.0, mp, created, _bands(bands))}
 
 
 @router.get("/projects/{project}/views")
