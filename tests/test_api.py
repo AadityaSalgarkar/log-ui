@@ -91,6 +91,11 @@ def test_metrics_bands(client):
     assert bad.status_code == 422 and "key:window" in bad.json()["detail"]
 
 
+def test_large_responses_are_gzipped(client):
+    r = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a,run-b"}, headers={"accept-encoding": "gzip"})
+    assert r.headers.get("content-encoding") == "gzip" and r.json()["series"]
+
+
 def test_system_empty(client):
     s = client.get(f"/api/projects/{PROJECT}/system", params={"runs": "run-a"}).json()
     assert s["series"] == {}

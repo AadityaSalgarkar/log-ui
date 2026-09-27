@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -23,6 +24,16 @@ HINT = (
 )
 
 
+class ImmutableStaticFiles(StaticFiles):
+    """Vite puts a content hash in every asset name, so a cached copy can never be stale."""
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 def create_app(settings: Settings | None = None, static_dir: Path | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     static_dir = Path(static_dir or STATIC_DIR)
@@ -36,10 +47,13 @@ def create_app(settings: Settings | None = None, static_dir: Path | None = None)
     def contract_error(_request: Request, exc: ContractError):
         return JSONResponse({"detail": f"unsupported trackio store: {exc}"}, status_code=500)
 
+    # Metric payloads and the JS bundle are highly compressible; this matters over an SSH tunnel.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+
     index = static_dir / "index.html"
     assets = static_dir / "assets"
     if assets.is_dir():
-        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+        app.mount("/assets", ImmutableStaticFiles(directory=assets), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):

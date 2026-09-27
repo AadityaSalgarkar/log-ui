@@ -22,7 +22,9 @@ def test_spa_routing_with_bundle(store_dir, tmp_path):
     for path in ("/", "/p/demo", "/p/demo/runs/run-a", "/p/demo/views/ladder?runs=a"):
         r = c.get(path)
         assert r.status_code == 200 and "log-ui test" in r.text, path
-    assert c.get("/assets/app.js").text == "console.log(1)"
+    asset = c.get("/assets/app.js")
+    assert asset.text == "console.log(1)" and "immutable" in asset.headers["cache-control"]
+    assert "cache-control" not in c.get("/").headers  # index.html must revalidate to pick up new bundles
     assert c.get("/favicon.svg").text == "<svg/>"
     assert c.get("/api/health").json()["ok"] is True
     assert "log-ui test" not in c.get("/api/nothing").text
