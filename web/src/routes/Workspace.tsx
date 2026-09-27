@@ -84,6 +84,8 @@ export default function WorkspacePage() {
     for (const per of Object.values(series)) for (const k of Object.keys(per)) set.add(k)
     return [...set]
   }, [series])
+  // Pins persist per project, so some may name keys the selected runs never logged; show and count only the rest.
+  const shownPins = useMemo(() => [...pins].filter((k) => keys.includes(k)), [pins, keys])
   const groups = useMemo(() => groupKeys(keys.filter((k) => !pins.has(k))), [keys, pins])
   const orderedGroups = useMemo(() => {
     const names = [...groups.keys()]
@@ -128,9 +130,9 @@ export default function WorkspacePage() {
         <p className="text-sm text-destructive">Could not load metrics: {(metricsQ.error as Error).message}</p>
       ) : (
         <div className="flex flex-col gap-6">
-          {pins.size > 0 && (
-            <Section title="pinned" count={pins.size} defaultOpen>
-              <div className={GRID}>{[...pins].filter((k) => keys.includes(k)).map((k) => card(k, false))}</div>
+          {shownPins.length > 0 && (
+            <Section title="pinned" count={shownPins.length} defaultOpen>
+              <div className={GRID}>{shownPins.map((k) => card(k, false))}</div>
             </Section>
           )}
           {orderedGroups.map((g, i) => (
