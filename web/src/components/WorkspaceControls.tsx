@@ -38,7 +38,7 @@ export function PointsInput({ value, onCommit }: { value: number; onCommit: (n: 
         inputMode="numeric"
         value={text}
         aria-invalid={parsed === undefined}
-        title="Points per series: a whole number, or 'all'. Band windows cover n / points raw values."
+        title="Points plotted per series: a whole number, or 'all'."
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {

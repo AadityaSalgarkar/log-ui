@@ -26,11 +26,10 @@ const BAND_LABEL = { none: "", std: "mean ± std", minmax: "min – max" } as co
 function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hidePrefix = false, className, ...chart }: ChartCardProps) {
   const [open, setOpen] = useState(false)
   const settings = chart.settings ?? DEFAULT_CHART_SETTINGS
-  // Runs of different lengths get different window sizes; report the range rather than one run's.
+  // The API caps the window at each run's length, so short runs can use fewer points than the setting.
   const windows = Object.values(chart.series).flatMap((s) => (s?.band ? [s.band.window] : []))
   const [wMin, wMax] = windows.length ? [Math.min(...windows), Math.max(...windows)] : [null, null]
-  const windowSize = wMax
-  const windowText = wMin === null ? "" : wMin === wMax ? `${wMin}-pt windows` : `${wMin}–${wMax}-pt windows`
+  const windowText = wMin === null ? "" : wMin === wMax ? `${wMin}-pt window` : `${wMin}–${wMax}-pt window`
   const customized = !isDefault(settings)
   const note = settings.band !== "none" ? [BAND_LABEL[settings.band], windowText].filter(Boolean).join(" · ") : ""
 
@@ -60,7 +59,7 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-72">
-              <ChartSettingsForm value={settings} onChange={onSettingsChange} bands={bands} window={windowSize} />
+              <ChartSettingsForm value={settings} onChange={onSettingsChange} bands={bands} shortestRun={wMin} />
             </PopoverContent>
           </Popover>
         )}

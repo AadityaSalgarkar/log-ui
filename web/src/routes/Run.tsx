@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { SYSTEM_ID, bandKeysByEndpoint, type ChartSettings } from "@/lib/chart-settings"
+import { SYSTEM_ID, bandRequests, type ChartSettings } from "@/lib/chart-settings"
 import { fmtDate, fmtDuration, fmtInt, fmtNum } from "@/lib/format"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
@@ -47,18 +47,18 @@ export default function RunPage() {
   const [state] = useUrlState()
   const [filter, setFilter] = useState("")
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const { metrics: bandKeys, system: sysBandKeys } = useMemo(() => bandKeysByEndpoint(chartSettings), [chartSettings])
+  const { metrics: bands, system: sysBands } = useMemo(() => bandRequests(chartSettings), [chartSettings])
   const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: (q) => (q.state.data?.status === "running" ? 5_000 : false) })
   const metrics = useQuery({
-    queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bandKeys],
+    queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bands],
     queryFn: ({ signal }) =>
-      api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
+      api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bands }, signal),
     placeholderData: keepPreviousData,
     refetchInterval: detail.data?.status === "running" ? 5_000 : false,
   })
   const system = useQuery({
-    queryKey: ["system", project, run, sysBandKeys],
-    queryFn: () => api.system(project, [run], undefined, sysBandKeys),
+    queryKey: ["system", project, run, sysBands],
+    queryFn: () => api.system(project, [run], undefined, sysBands),
     placeholderData: keepPreviousData,
     enabled: (detail.data?.system_keys.length ?? 0) > 0,
   })

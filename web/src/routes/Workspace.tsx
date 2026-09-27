@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { bandKeysByEndpoint } from "@/lib/chart-settings"
+import { bandRequests } from "@/lib/chart-settings"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
 import type { SeriesMap } from "@/types"
@@ -66,13 +66,13 @@ export default function WorkspacePage() {
   const [state, update] = useUrlState()
   const [pins, togglePin] = usePins(project)
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const bandKeys = useMemo(() => bandKeysByEndpoint(chartSettings).metrics, [chartSettings])
+  const bands = useMemo(() => bandRequests(chartSettings).metrics, [chartSettings])
 
   const anyRunning = runs.some((r) => selected.includes(r.name) && r.status === "running")
   const metricsQ = useQuery({
-    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints, bandKeys],
+    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints, bands],
     queryFn: ({ signal }) =>
-      api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
+      api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bands }, signal),
     enabled: selected.length > 0,
     placeholderData: keepPreviousData,
     refetchInterval: anyRunning ? 5_000 : false,

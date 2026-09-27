@@ -106,8 +106,9 @@ describe("charts", () => {
   })
   it("settings form sets the band and commits valid limits only", async () => {
     const onChange = vi.fn()
-    render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={onChange} bands window={4} />)
-    expect(screen.getByText(/covers 4 raw points/)).toBeInTheDocument()
+    render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={onChange} bands shortestRun={4} />)
+    expect(screen.getByText(/spread of the 10 raw values centred on it/)).toBeInTheDocument()
+    expect(screen.getByText(/shorter than that use all 4 of their points/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole("radio", { name: "min – max" }))
     expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_CHART_SETTINGS, band: "minmax" })
     await userEvent.type(screen.getByLabelText("y max"), "1e-3{Enter}")
@@ -117,6 +118,18 @@ describe("charts", () => {
     expect(screen.getByLabelText("x min")).toHaveAttribute("aria-invalid", "true")
     expect(parseLimit("")).toBeNull()
     expect(parseLimit(" -2.5 ")).toBe(-2.5)
+  })
+  it("settings form edits the band window in raw points", async () => {
+    const onChange = vi.fn()
+    render(<ChartSettingsForm value={{ ...DEFAULT_CHART_SETTINGS, band: "std" }} onChange={onChange} bands />)
+    const input = screen.getByLabelText("window")
+    await userEvent.clear(input)
+    await userEvent.type(input, "25{Enter}")
+    expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_CHART_SETTINGS, band: "std", window: 25 })
+    await userEvent.clear(input)
+    await userEvent.type(input, "0{Enter}")
+    expect(input).toHaveAttribute("aria-invalid", "true")
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
   it("hides band modes where there are no windows", () => {
     render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={() => {}} bands={false} />)
@@ -128,7 +141,7 @@ describe("charts", () => {
     const series = { alpha: { x: [1, 2], y: [1, 2], band: b(4) }, beta: { x: [1, 2], y: [2, 1], band: b(11) } }
     const settings = { ...DEFAULT_CHART_SETTINGS, band: "minmax" as const }
     render(<ChartCard title="train/loss/total" hidePrefix series={series} colors={colors} settings={settings} />)
-    expect(screen.getByText("min – max · 4–11-pt windows")).toBeInTheDocument()
+    expect(screen.getByText("min – max · 4–11-pt window")).toBeInTheDocument()
   })
   it("multi-level keys keep their inner path under the group header", () => {
     render(<MetricKey name="train/loss/aux" hidePrefix />)

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
-import { DEFAULT_CHART_SETTINGS, bandIds, bandKeysByEndpoint, isDefault, parseChartSettings } from "./chart-settings"
+import { DEFAULT_CHART_SETTINGS, bandIds, bandRequests, isDefault, parseChartSettings, parseWindow } from "./chart-settings"
 import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
 import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
 
@@ -83,9 +83,11 @@ describe("series", () => {
     expect(g.get("train")).toEqual(["train/loss/aux", "train/loss/total", "train/lr"])
     expect(g.get("val")).toEqual(["val/x/bpb"])
   })
-  it("sends only metric keys for bands, system keys to their own endpoint", () => {
-    const m = parseChartSettings(JSON.stringify({ "train/loss": { band: "std" }, "system:gpu": { band: "minmax" }, "view:val/x": { band: "std" }, lr: { yMin: 0 } }))
-    expect(bandKeysByEndpoint(m)).toEqual({ metrics: ["train/loss"], system: ["gpu"] })
+  it("requests bands as key:window, metric and system keys to their own endpoints", () => {
+    const m = parseChartSettings(
+      JSON.stringify({ "train/loss": { band: "std", window: 25 }, "system:gpu": { band: "minmax" }, "view:val/x": { band: "std" }, lr: { yMin: 0 } }),
+    )
+    expect(bandRequests(m)).toEqual({ metrics: ["train/loss:25"], system: ["gpu:10"] })
   })
   it("groups keys by prefix", () => {
     const g = groupKeys(["val/x/bpb", "train/loss", "loss", "train/lr"])
@@ -98,9 +100,9 @@ describe("series", () => {
 
 describe("chart settings", () => {
   it("parses stored settings tolerantly", () => {
-    const stored = JSON.stringify({ a: { band: "std", xMin: 10, yMax: 2.5 }, b: { band: "bogus", xMin: "x" }, c: 3 })
+    const stored = JSON.stringify({ a: { band: "std", window: 30, xMin: 10, yMax: 2.5 }, b: { band: "bogus", window: -3, xMin: "x" }, c: 3 })
     const m = parseChartSettings(stored)
-    expect(m.a).toEqual({ band: "std", xMin: 10, xMax: null, yMin: null, yMax: 2.5 })
+    expect(m.a).toEqual({ band: "std", window: 30, xMin: 10, xMax: null, yMin: null, yMax: 2.5 })
     expect(m.b).toEqual(DEFAULT_CHART_SETTINGS)
     expect(m.c).toBeUndefined()
     expect(parseChartSettings("not json")).toEqual({})
@@ -112,6 +114,9 @@ describe("chart settings", () => {
     expect(bandIds(m, ["a", "missing"])).toEqual(["a"])
     expect(isDefault(DEFAULT_CHART_SETTINGS)).toBe(true)
     expect(isDefault(m.n)).toBe(false)
+    expect(isDefault({ ...DEFAULT_CHART_SETTINGS, window: 5 })).toBe(false)
+    expect(parseWindow("12")).toBe(12)
+    for (const bad of ["0", "1.5", "-2", "x", "10001"]) expect(parseWindow(bad)).toBeUndefined()
   })
 })
 

@@ -4,13 +4,25 @@ export type BandMode = "none" | "std" | "minmax"
 
 export interface ChartSettings {
   band: BandMode
+  window: number // raw points per band window, centred on each plotted point
   xMin: number | null
   xMax: number | null
   yMin: number | null
   yMax: number | null
 }
 
-export const DEFAULT_CHART_SETTINGS: ChartSettings = { band: "none", xMin: null, xMax: null, yMin: null, yMax: null }
+export const DEFAULT_WINDOW = 10
+export const MAX_WINDOW = 10_000 // mirrors log_ui.series.MAX_BAND_WINDOW
+
+export const DEFAULT_CHART_SETTINGS: ChartSettings = { band: "none", window: DEFAULT_WINDOW, xMin: null, xMax: null, yMin: null, yMax: null }
+
+/** A band window: a whole number of raw points in [1, MAX_WINDOW]; undefined when invalid. */
+export function parseWindow(text: string): number | undefined {
+  const t = text.trim()
+  if (!/^\d+$/.test(t)) return undefined
+  const n = Number(t)
+  return n >= 1 && n <= MAX_WINDOW ? n : undefined
+}
 
 export type ChartSettingsMap = Record<string, ChartSettings>
 
@@ -32,6 +44,7 @@ export function parseChartSettings(raw: string | null): ChartSettingsMap {
     if (!v || typeof v !== "object") continue
     out[id] = {
       band: BAND_MODES.includes(v.band as BandMode) ? (v.band as BandMode) : "none",
+      window: parseWindow(String(v.window ?? "")) ?? DEFAULT_WINDOW,
       xMin: finiteOrNull(v.xMin),
       xMax: finiteOrNull(v.xMax),
       yMin: finiteOrNull(v.yMin),
@@ -42,7 +55,7 @@ export function parseChartSettings(raw: string | null): ChartSettingsMap {
 }
 
 export function isDefault(s: ChartSettings): boolean {
-  return s.band === "none" && s.xMin === null && s.xMax === null && s.yMin === null && s.yMax === null
+  return s.band === "none" && s.window === DEFAULT_WINDOW && s.xMin === null && s.xMax === null && s.yMin === null && s.yMax === null
 }
 
 /** "" clears a limit (null); text that is not a finite number is invalid (undefined). */
@@ -69,11 +82,12 @@ export function bandIds(map: ChartSettingsMap, ids: string[]): string[] {
 export const SYSTEM_ID = "system:"
 export const VIEW_ID = "view:"
 
-/** Metric keys (and system keys) that need bands, split by the endpoint that serves them. */
-export function bandKeysByEndpoint(map: ChartSettingsMap): { metrics: string[]; system: string[] } {
+/** Band requests as the API's `key:window` entries, split by the endpoint that serves the key. */
+export function bandRequests(map: ChartSettingsMap): { metrics: string[]; system: string[] } {
   const ids = bandIds(map, Object.keys(map))
+  const spec = (key: string, id: string) => `${key}:${map[id].window}`
   return {
-    metrics: ids.filter((id) => !id.startsWith(SYSTEM_ID) && !id.startsWith(VIEW_ID)),
-    system: ids.filter((id) => id.startsWith(SYSTEM_ID)).map((id) => id.slice(SYSTEM_ID.length)),
+    metrics: ids.filter((id) => !id.startsWith(SYSTEM_ID) && !id.startsWith(VIEW_ID)).map((id) => spec(id, id)),
+    system: ids.filter((id) => id.startsWith(SYSTEM_ID)).map((id) => spec(id.slice(SYSTEM_ID.length), id)),
   }
 }
