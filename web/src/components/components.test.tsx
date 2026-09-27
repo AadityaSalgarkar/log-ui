@@ -7,6 +7,7 @@ import { LadderChart } from "@/components/charts/LadderChart"
 import { ChartCard } from "@/components/charts/ChartCard"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
 import { MetricKey } from "@/components/MetricKey"
+import { PointsInput } from "@/components/WorkspaceControls"
 import { MetricChart } from "@/components/charts/MetricChart"
 import { DEFAULT_CHART_SETTINGS, axisDomain, parseLimit } from "@/lib/chart-settings"
 import { cellColor } from "@/components/charts/Heatmap"
@@ -133,6 +134,23 @@ describe("charts", () => {
     render(<MetricKey name="train/loss/aux" hidePrefix />)
     expect(screen.getByTitle("train/loss/aux")).toHaveTextContent(/^loss\/aux$/)
     expect(screen.getByText("aux")).toHaveClass("font-semibold")
+  })
+  it("points field takes any whole number or 'all', and ignores invalid text", async () => {
+    const onCommit = vi.fn()
+    render(<PointsInput value={1000} onCommit={onCommit} />)
+    const input = screen.getByRole("combobox")
+    await userEvent.clear(input)
+    await userEvent.type(input, "750{Enter}")
+    expect(onCommit).toHaveBeenLastCalledWith(750)
+    await userEvent.clear(input)
+    await userEvent.type(input, "lots{Enter}")
+    expect(input).toHaveAttribute("aria-invalid", "true")
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    await userEvent.type(input, "{Escape}")
+    expect(input).toHaveValue("1000")
+    await userEvent.clear(input)
+    await userEvent.type(input, "all{Enter}")
+    expect(onCommit).toHaveBeenLastCalledWith(0)
   })
   it("heatmap colors diverge around zero", () => {
     expect(cellColor(null, -1, 1, true)).toBe("transparent")

@@ -36,12 +36,25 @@ export function parseState(sp: URLSearchParams): WsState {
     x: X_MODES.includes(x as XMode) ? (x as XMode) : DEFAULTS.x,
     smoothing: Number.isFinite(sm) && sm >= 0 && sm < 1 ? sm : DEFAULTS.smoothing,
     logy: sp.get("logy") === "1",
-    maxPoints: Number.isFinite(mp) && mp >= 0 && sp.get("max_points") !== null ? mp : DEFAULTS.maxPoints,
+    maxPoints: Number.isInteger(mp) && mp >= 0 && sp.get("max_points") !== null ? mp : DEFAULTS.maxPoints,
     q: sp.get("q") ?? "",
     metric: sp.get("metric"),
     point: point === "best" ? "best" : "last",
   }
 }
+
+export const POINT_PRESETS = [200, 500, 1000, 2000, 5000]
+
+/** Points per series: a positive whole number, or "all"/0 for every logged point; undefined when invalid. */
+export function parsePoints(text: string): number | undefined {
+  const t = text.trim().toLowerCase().replace(/[,_\s]/g, "")
+  if (t === "all" || t === "0") return 0
+  if (!/^\d+$/.test(t)) return undefined
+  const n = Number(t)
+  return n >= 1 && n <= 1_000_000 ? n : undefined
+}
+
+export const formatPoints = (n: number) => (n === 0 ? "all" : String(n))
 
 /** Writes only non-default values so URLs stay short. Unrelated params in `base` are preserved. */
 export function stateToParams(state: WsState, base?: URLSearchParams): URLSearchParams {

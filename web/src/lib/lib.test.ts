@@ -4,7 +4,7 @@ import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
 import { DEFAULT_CHART_SETTINGS, bandIds, bandKeysByEndpoint, isDefault, parseChartSettings } from "./chart-settings"
 import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
-import { DEFAULTS, parseState, stateToParams } from "./url-state"
+import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
 
 describe("colors", () => {
   it("assigns stable colors by creation order regardless of list order", () => {
@@ -123,6 +123,16 @@ describe("url state", () => {
     expect(sp.get("runs")).toBe("a,b")
     expect(sp.get("max_points")).toBeNull()
     expect(parseState(sp)).toEqual(state)
+  })
+  it("parses free-form point counts", () => {
+    expect(parsePoints("750")).toBe(750)
+    expect(parsePoints(" 10,000 ")).toBe(10000)
+    expect(parsePoints("All")).toBe(0)
+    expect(parsePoints("0")).toBe(0)
+    for (const bad of ["", "-5", "1.5", "abc", "2000000"]) expect(parsePoints(bad)).toBeUndefined()
+    expect(formatPoints(0)).toBe("all")
+    expect(parseState(new URLSearchParams("max_points=750")).maxPoints).toBe(750)
+    expect(parseState(new URLSearchParams("max_points=1.5")).maxPoints).toBe(DEFAULTS.maxPoints) // the API needs an integer
   })
   it("uses defaults for missing or invalid values", () => {
     const s = parseState(new URLSearchParams("x=bogus&smoothing=2&max_points=abc"))

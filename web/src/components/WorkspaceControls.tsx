@@ -1,8 +1,11 @@
+import { useState } from "react"
+
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Toggle } from "@/components/ui/toggle"
-import type { WsState } from "@/lib/url-state"
+import { POINT_PRESETS, formatPoints, parsePoints, type WsState } from "@/lib/url-state"
 import type { XMode } from "@/types"
 
 const X_LABELS: Record<XMode, string> = { step: "step", relative_time: "relative time", wall_time: "wall time" }
@@ -15,6 +18,41 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
       </Label>
       {children}
     </div>
+  )
+}
+
+/** Free-form point count with the usual presets as suggestions; applied on Enter or blur, reverted on Escape. */
+export function PointsInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [text, setText] = useState(formatPoints(value))
+  const parsed = parsePoints(text)
+  const commit = () => {
+    if (parsed === undefined) return
+    if (parsed !== value) onCommit(parsed)
+    setText(formatPoints(parsed))
+  }
+  return (
+    <>
+      <Input
+        id="ctl-points"
+        list="ctl-points-presets"
+        inputMode="numeric"
+        value={text}
+        aria-invalid={parsed === undefined}
+        title="Points per series: a whole number, or 'all'. Band windows cover n / points raw values."
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit()
+          if (e.key === "Escape") setText(formatPoints(value))
+        }}
+        className="h-7 w-20 bg-card font-mono text-xs"
+      />
+      <datalist id="ctl-points-presets">
+        {[...POINT_PRESETS.map(String), "all"].map((v) => (
+          <option key={v} value={v} />
+        ))}
+      </datalist>
+    </>
   )
 }
 
@@ -49,18 +87,7 @@ export function WorkspaceControls({ state, update }: { state: WsState; update: (
         <span className="w-8 font-mono text-xs tabular-nums">{state.smoothing.toFixed(2)}</span>
       </Field>
       <Field label="points" htmlFor="ctl-points">
-        <Select value={String(state.maxPoints)} onValueChange={(v) => update({ maxPoints: Number(v) })}>
-          <SelectTrigger id="ctl-points" size="sm" className="h-7 w-20 bg-card font-mono text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[200, 500, 1000, 2000, 5000, 0].map((n) => (
-              <SelectItem key={n} value={String(n)} className="font-mono text-xs">
-                {n === 0 ? "all" : n}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PointsInput key={state.maxPoints} value={state.maxPoints} onCommit={(n) => update({ maxPoints: n })} />
       </Field>
       <Toggle
         size="sm"
