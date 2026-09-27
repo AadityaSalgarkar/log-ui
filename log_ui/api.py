@@ -60,7 +60,8 @@ def run_detail(request: Request, project: str, run: str):
     if info is None:
         raise HTTPException(404, f"run {run!r} not found")
     series = build_series(store.metric_rows(project, [run])).get(run, {})
-    eval_steps = sorted({s for k, ser in series.items() if not k.startswith("train/") for s in ser.steps})
+    # Eval steps: where a prefixed, non-train key was logged. Ungrouped keys (epoch, lr) are logged every step.
+    eval_steps = sorted({s for k, ser in series.items() if "/" in k and not k.startswith("train/") for s in ser.steps})
     sys_rows = store.system_rows(project, [run], max_rows=5000)
     sys_keys = sorted({k for *_, m in sys_rows for k in m})
     return {**asdict(info), "keys": sorted(series), "eval_steps": eval_steps, "system_keys": sys_keys}

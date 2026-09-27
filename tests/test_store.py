@@ -47,8 +47,10 @@ def test_cache_follows_trackio_writes_and_deletes(store_dir):
     import trackio
 
     store = Store(store_dir)
-    before = store.runs(OTHER)
-    assert store.runs(OTHER) is before  # cached
+    store.runs(OTHER)
+    cached = store._runs_cache[OTHER]
+    store.runs(OTHER)
+    assert store._runs_cache[OTHER] is cached  # unchanged file: no reload
     trackio.init(project=OTHER, name="extra", config={"a": 2})
     trackio.log({"train/loss": 1.0}, step=1)
     trackio.finish()
@@ -56,6 +58,14 @@ def test_cache_follows_trackio_writes_and_deletes(store_dir):
     extra = next(r for r in trackio.Api().runs(OTHER) if r.name == "extra")
     assert extra.delete()  # deletion belongs to trackio; log-ui only observes it
     assert {r.name for r in store.runs(OTHER)} == {"solo"}
+
+
+def test_status_follows_the_clock_not_the_cache(store_dir):
+    store = Store(store_dir, stale_seconds=3600)
+    assert store.run(PROJECT, "run-a").status == "running"
+    store.stale_seconds = 0  # same cached rows, but "now" is past the window: the run must read as finished
+    assert store.run(PROJECT, "run-a").status == "finished"
+    assert store.runs(PROJECT)[0].last_logged_at is not None
 
 
 def test_bad_project_names(store_dir):

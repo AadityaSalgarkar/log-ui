@@ -6,7 +6,7 @@ All file access goes through `log_ui.contract`; this module holds no SQL and nev
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -87,16 +87,22 @@ class Store:
         sig = contract.signature(contract.project_path(self.dir, project))
         cached = self._runs_cache.get(project)
         if cached and cached[0] == sig:
-            return cached[1]
-        runs = self._load_runs(project)
-        self._runs_cache[project] = (sig, runs)
-        return runs
+            runs = cached[1]
+        else:
+            runs = self._load_runs(project)
+            self._runs_cache[project] = (sig, runs)
+        # Status depends on the clock, not just the file: a run that stops logging leaves the db untouched.
+        now = time.time()
+        return [replace(r, status=self._status(r.last_logged_at, now)) for r in runs]
+
+    def _status(self, last_logged_at: float | None, now: float) -> str:
+        recent = last_logged_at is not None and now - last_logged_at < self.stale_seconds
+        return "running" if recent else "finished"
 
     def run(self, project: str, name: str) -> RunInfo | None:
         return next((r for r in self.runs(project) if r.name == name), None)
 
     def _load_runs(self, project: str) -> list[RunInfo]:
-        now = time.time()
         with contract.open_project(self.dir, project) as reader:
             configs = {c.run_name: c for c in reader.configs()}
             stats = {s.run_name: s for s in reader.run_stats()}
@@ -105,7 +111,6 @@ class Store:
                 c, s = configs.get(name), stats.get(name)
                 created_at = (c.created_at if c else "") or (s.first_ts if s else "") or ""
                 last_logged = parse_ts(s.last_ts) if s else None
-                recent = last_logged is not None and now - last_logged < self.stale_seconds
                 summary: dict[str, float | None] = {}
                 for metrics in reader.latest_metrics(name, SUMMARY_ROWS):  # newest first, first seen wins
                     for k, v in metrics.items():
@@ -118,7 +123,7 @@ class Store:
                         created_epoch=parse_ts(created_at) or 0.0,
                         last_step=s.last_step if s else None,
                         last_logged_at=last_logged,
-                        status="running" if recent else "finished",
+                        status="finished",  # set per read in runs()
                         config=flatten(c.config) if c else {},
                         summary=summary,
                         n_rows=s.n_rows if s else 0,

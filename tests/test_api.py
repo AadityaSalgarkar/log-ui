@@ -38,6 +38,23 @@ def test_runs_and_run_detail(client):
     assert client.get(f"/api/projects/{PROJECT}/runs/nope").status_code == 404
 
 
+def test_eval_steps_skip_ungrouped_and_train_keys(client):
+    import trackio
+
+    trackio.init(project="evalsteps", name="r", config={})
+    for step in range(1, 11):
+        payload = {"epoch": step // 5, "train/loss/total": 1.0, "train/loss/aux": 0.1}
+        if step % 5 == 0:
+            payload["val/loss"] = 0.5
+        trackio.log(payload, step=step)
+    trackio.finish()
+    d = client.get("/api/projects/evalsteps/runs/r").json()
+    assert d["eval_steps"] == [5, 10]
+    assert {"train/loss/total", "train/loss/aux", "epoch"} <= set(d["keys"])
+    keys = {k["key"]: k for k in client.get("/api/projects/evalsteps/keys").json()}
+    assert keys["train/loss/aux"]["prefix"] == "train" and keys["epoch"]["prefix"] == ""
+
+
 def test_keys_and_metrics(client):
     keys = client.get(f"/api/projects/{PROJECT}/keys").json()
     assert {"key": "train/loss", "prefix": "train", "n_runs": 2} in keys

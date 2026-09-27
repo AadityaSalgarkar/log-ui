@@ -147,7 +147,9 @@ def signature(path: Path) -> tuple:
 
 
 def last_modified(path: Path) -> float:
-    mtimes = [s[0] for s in signature(path) if s is not None]
+    """Epoch seconds of the last write. An empty WAL holds no writes (sqlite recreates it on open), so it is ignored."""
+    db, wal = signature(path)
+    mtimes = [s[0] for s in (db, wal if wal and wal[1] > 0 else None) if s is not None]
     return max(mtimes) / 1e9 if mtimes else 0.0
 
 

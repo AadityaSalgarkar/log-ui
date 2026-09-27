@@ -1,5 +1,6 @@
 """The trackio store contract, checked against stores written by the installed trackio."""
 
+import os
 import shutil
 import sqlite3
 from importlib.metadata import version
@@ -72,6 +73,18 @@ def test_project_names(tmp_path):
     with pytest.raises(KeyError):
         with contract.open_project(tmp_path, "absent"):
             pass
+
+
+def test_last_modified_ignores_an_empty_wal(tmp_path):
+    db = tmp_path / "p.db"
+    sqlite3.connect(db).close()
+    os.utime(db, (1_000_000, 1_000_000))
+    wal = tmp_path / "p.db-wal"
+    wal.touch()  # sqlite creates an empty WAL on open without writing anything
+    assert contract.last_modified(db) == 1_000_000
+    wal.write_bytes(b"x")
+    os.utime(wal, (2_000_000, 2_000_000))
+    assert contract.last_modified(db) == 2_000_000
 
 
 def test_value_decoding():
