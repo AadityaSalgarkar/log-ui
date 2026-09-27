@@ -4,7 +4,7 @@ export type BandMode = "none" | "std" | "minmax"
 
 export interface ChartSettings {
   band: BandMode
-  window: number // raw points per band window, centred on each plotted point
+  window: number // raw points per band window, ending at each plotted point (trailing)
   xMin: number | null
   xMax: number | null
   yMin: number | null

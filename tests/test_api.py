@@ -84,7 +84,7 @@ def test_metrics_bands(client):
     loss, band = m["train/loss"], m["train/loss"]["band"]
     assert band["window"] == 5 and band["x"] == loss["x"] and len(band["x"]) == 50  # independent of max_points
     assert all(lo <= mu <= hi for lo, mu, hi in zip(band["min"], band["mean"], band["max"]))
-    assert all(s > 0 for s in band["std"])  # a decaying loss varies within every 5-step window
+    assert band["std"][0] == 0 and all(s > 0 for s in band["std"][1:])  # trailing: step 1 has nothing before it
     few = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "max_points": 10}).json()
     assert few["series"]["run-a"]["train/loss"]["band"]["window"] == 5  # still 5 raw points, not 50 / 10
     bad = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "bands": "train/loss"})

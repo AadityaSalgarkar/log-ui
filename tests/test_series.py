@@ -50,7 +50,7 @@ def test_downsample_keeps_extremes_and_bounds():
 
 
 def _brute_bands(y: np.ndarray, at: np.ndarray, w: int) -> dict[str, list[float]]:
-    wins = [y[max(0, i - (w - 1) // 2) : i + w // 2 + 1] for i in at]
+    wins = [y[max(0, i - w + 1) : i + 1] for i in at]  # trailing: the w points ending at i
     return {"mean": [v.mean() for v in wins], "std": [v.std() for v in wins],
             "min": [v.min() for v in wins], "max": [v.max() for v in wins]}
 
@@ -78,12 +78,12 @@ def test_rolling_bands_chunking_matches_unchunked():
     assert np.allclose(got["max"][::997], want["max"]) and np.allclose(got["mean"][::997], want["mean"])
 
 
-def test_payload_band_is_centred_on_plotted_points_and_uses_raw_values():
+def test_payload_band_is_a_trailing_window_of_raw_values():
     s = Series(steps=[1, 2, 3, 4, 5], values=[0.0, 2.0, 4.0, 6.0, 8.0], ts=[0.0, 1.0, 2.0, 3.0, 4.0])
     p = to_payload(s, "step", 0.9, 0, 0.0, band_window=3)  # smoothing affects y, not the band
     assert p["band"]["x"] == p["x"] == [1, 2, 3, 4, 5]
-    assert p["band"]["mean"] == [1.0, 2.0, 4.0, 6.0, 7.0]  # edges use the points that exist
-    assert p["band"]["min"] == [0.0, 0.0, 2.0, 4.0, 6.0] and p["band"]["max"] == [2.0, 4.0, 6.0, 8.0, 8.0]
+    assert p["band"]["mean"] == [0.0, 1.0, 2.0, 4.0, 6.0]  # start of run: only the points so far
+    assert p["band"]["min"] == [0.0, 0.0, 0.0, 2.0, 4.0] and p["band"]["max"] == [0.0, 2.0, 4.0, 6.0, 8.0]  # no look-ahead
     assert p["band"]["window"] == 3
     assert to_payload(s, "step", 0.0, 0, 0.0, band_window=50)["band"]["window"] == 5  # capped at the run length
     assert "band" not in to_payload(s, "step", 0.0, 2, 0.0)

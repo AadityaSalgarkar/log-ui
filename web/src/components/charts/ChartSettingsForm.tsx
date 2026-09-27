@@ -73,7 +73,7 @@ export function ChartSettingsForm({ value, onChange, bands, shortestRun }: Chart
             <span className="text-[11px] text-muted-foreground">raw points</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Each plotted point shows the spread of the {value.window} raw values centred on it, whatever 'points' is set to.
+            Each plotted point shows the spread of the last {value.window} raw values up to it (no look-ahead), whatever 'points' is set to.
             {shortestRun !== null && shortestRun !== undefined && shortestRun < value.window && ` Runs shorter than that use all ${shortestRun} of their points.`}
           </p>
         </div>

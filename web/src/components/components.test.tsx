@@ -107,7 +107,7 @@ describe("charts", () => {
   it("settings form sets the band and commits valid limits only", async () => {
     const onChange = vi.fn()
     render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={onChange} bands shortestRun={4} />)
-    expect(screen.getByText(/spread of the 10 raw values centred on it/)).toBeInTheDocument()
+    expect(screen.getByText(/spread of the last 10 raw values up to it/)).toBeInTheDocument()
     expect(screen.getByText(/shorter than that use all 4 of their points/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole("radio", { name: "min – max" }))
     expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_CHART_SETTINGS, band: "minmax" })

@@ -95,17 +95,17 @@ _CHUNK = 4096  # rows of the (points x window) view reduced at a time, bounding 
 
 
 def rolling_bands(y: np.ndarray, at: np.ndarray, window: int) -> dict[str, np.ndarray]:
-    """Mean, population std, min and max of raw values in a window of `window` points centred on each index in `at`.
+    """Mean, population std, min and max of the `window` raw values ending at each index in `at` (trailing window).
 
-    The window around index i spans [i - (window - 1) // 2, i + window // 2], clipped to the series, so edges use
-    fewer points instead of padding. Independent of how many points are plotted.
+    The window for index i spans [i - window + 1, i]: only points logged up to i, never later ones. At the start of
+    a run it holds the points that exist so far instead of padding. Independent of how many points are plotted.
     """
     # Stats come straight from each window's values: running sums of y and y^2 would lose the std of a small
     # spread on a large offset (e.g. loss 1000.0 +- 0.001) to cancellation.
     w = max(1, min(window, y.size))
     pad = np.pad(y, (w, w), constant_values=np.nan)  # NaN edges: clipped windows are exact under nan-reductions
     view = np.lib.stride_tricks.sliding_window_view(pad, w)
-    starts = at - (w - 1) // 2 + w
+    starts = at + 1  # window [i - w + 1, i] begins at pad index i + 1
     out = {k: np.empty(at.size) for k in ("mean", "std", "min", "max")}
     for c in range(0, at.size, _CHUNK):
         rows, sl = view[starts[c : c + _CHUNK]], slice(c, c + _CHUNK)
