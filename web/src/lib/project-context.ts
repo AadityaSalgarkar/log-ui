@@ -12,6 +12,19 @@ export interface ProjectContextValue {
   isLoading: boolean
 }
 
+/**
+ * A string that changes exactly when any of the named runs logs new rows. Metric queries key on it instead of
+ * polling on a timer, so charts refetch and redraw only when there is something new to draw.
+ */
+export function runsRevision(runs: RunInfo[], names: string[]): string {
+  const wanted = new Set(names)
+  return runs
+    .filter((r) => wanted.has(r.name))
+    .map((r) => `${r.name}:${r.n_rows}:${r.last_step ?? ""}`)
+    .sort()
+    .join("|")
+}
+
 export const ProjectContext = createContext<ProjectContextValue | null>(null)
 
 export function useProject(): ProjectContextValue {

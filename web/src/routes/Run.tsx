@@ -3,6 +3,7 @@ import { useParams } from "react-router"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { ChartCard } from "@/components/charts/ChartCard"
+import { MetricPanel } from "@/components/charts/MetricPanel"
 import { RunSwatch } from "@/components/RunSwatch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,7 +15,7 @@ import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { SYSTEM_ID, bandRequests, type ChartSettings } from "@/lib/chart-settings"
 import { fmtDate, fmtDuration, fmtInt, fmtNum } from "@/lib/format"
-import { useProject } from "@/lib/project-context"
+import { runsRevision, useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
 
 
@@ -42,19 +43,21 @@ function KeyValueTable({ rows, filter }: { rows: [string, unknown][]; filter: st
 }
 
 export default function RunPage() {
-  const { project, colors } = useProject()
+  const { project, colors, runs } = useProject()
   const { run = "" } = useParams()
   const [state] = useUrlState()
   const [filter, setFilter] = useState("")
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const { metrics: bands, system: sysBands } = useMemo(() => bandRequests(chartSettings), [chartSettings])
-  const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: (q) => (q.state.data?.status === "running" ? 5_000 : false) })
+  const sysBands = useMemo(() => bandRequests(chartSettings).system, [chartSettings])
+  const revision = useMemo(() => runsRevision(runs, [run]), [runs, run])
+  const runOnly = useMemo(() => [run], [run])
+  // Keyed on the run's revision (from the polled runs list) instead of a timer: refetch only when it logs new rows.
+  const detail = useQuery({ queryKey: ["run", project, run, revision], queryFn: () => api.run(project, run), placeholderData: keepPreviousData, staleTime: Infinity })
   const metrics = useQuery({
-    queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bands],
-    queryFn: ({ signal }) =>
-      api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bands }, signal),
+    queryKey: ["metrics", project, runOnly, state.x, state.smoothing, state.maxPoints, revision],
+    queryFn: ({ signal }) => api.metrics(project, { runs: runOnly, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints }, signal),
     placeholderData: keepPreviousData,
-    refetchInterval: detail.data?.status === "running" ? 5_000 : false,
+    staleTime: Infinity,
   })
   const system = useQuery({
     queryKey: ["system", project, run, sysBands],
@@ -63,8 +66,11 @@ export default function RunPage() {
     enabled: (detail.data?.system_keys.length ?? 0) > 0,
   })
   const chartProps = (id: string) => ({ settings: settingsFor(chartSettings, id), onSettingsChange: (next: ChartSettings) => setChartSettings(id, next) })
-  const series = metrics.data?.series[run] ?? {}
-  const groups = useMemo(() => groupKeys(Object.keys(series)), [series])
+  const perKey = useMemo(() => {
+    const series = metrics.data?.series[run] ?? {}
+    return new Map(Object.keys(series).map((k) => [k, { [run]: series[k] }]))
+  }, [metrics.data, run])
+  const groups = useMemo(() => groupKeys([...perKey.keys()]), [perKey])
 
   if (detail.isPending) return <Skeleton className="h-40" />
   if (detail.isError) return <p className="text-sm text-destructive">{(detail.error as Error).message}</p>
@@ -98,7 +104,23 @@ export default function RunPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {keys.map((k) => (
-                  <ChartCard key={k} title={k} hidePrefix={g !== ""} series={{ [run]: series[k] }} colors={colors} order={[run]} xMode={state.x} logY={state.logy} syncId={`run-${run}`} {...chartProps(k)} />
+                  <MetricPanel
+                    key={k}
+                    project={project}
+                    metric={k}
+                    series={perKey.get(k)!}
+                    runs={runOnly}
+                    colors={colors}
+                    xMode={state.x}
+                    logY={state.logy}
+                    smoothing={state.smoothing}
+                    maxPoints={state.maxPoints}
+                    revision={revision}
+                    syncId={`run-${run}`}
+                    hidePrefix={g !== ""}
+                    settings={settingsFor(chartSettings, k)}
+                    onSettingsChange={setChartSettings}
+                  />
                 ))}
               </div>
             </div>

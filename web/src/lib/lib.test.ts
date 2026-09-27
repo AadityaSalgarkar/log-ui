@@ -4,6 +4,8 @@ import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
 import { DEFAULT_CHART_SETTINGS, bandIds, bandRequests, isDefault, parseChartSettings, parseWindow } from "./chart-settings"
 import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
+import type { RunInfo } from "@/types"
+import { runsRevision } from "./project-context"
 import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
 
 describe("colors", () => {
@@ -95,6 +97,16 @@ describe("series", () => {
     expect(g.get("train")).toEqual(["train/loss", "train/lr"])
     expect(lastValue({ x: [1, 2], y: [3, 4] })).toBe(4)
     expect(lastValue(undefined)).toBeNull()
+  })
+})
+
+describe("runs revision", () => {
+  const r = (name: string, n_rows: number, last_step: number) => ({ name, n_rows, last_step }) as RunInfo
+  it("changes only when a selected run logs new rows", () => {
+    const before = runsRevision([r("a", 10, 9), r("b", 5, 4)], ["a"])
+    expect(runsRevision([r("b", 99, 98), r("a", 10, 9)], ["a"])).toBe(before) // unselected runs and order don't matter
+    expect(runsRevision([r("a", 11, 10), r("b", 5, 4)], ["a"])).not.toBe(before)
+    expect(runsRevision([r("a", 10, 9)], ["a", "b"])).not.toBe(runsRevision([r("a", 10, 9), r("b", 1, 0)], ["a", "b"]))
   })
 })
 

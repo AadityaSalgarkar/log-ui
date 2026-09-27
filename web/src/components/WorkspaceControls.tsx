@@ -56,10 +56,35 @@ export function PointsInput({ value, onCommit }: { value: number; onCommit: (n: 
   )
 }
 
+/**
+ * Smoothing follows the thumb locally while dragging and is applied once, on release (or per key press). Applying
+ * on every step would refetch every chart for each intermediate value.
+ */
+export function SmoothingSlider({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const [live, setLive] = useState(value)
+  const round = (v: number) => Number(v.toFixed(2))
+  return (
+    <>
+      <Slider
+        className="w-36"
+        value={[live]}
+        min={0}
+        max={0.99}
+        step={0.01}
+        onValueChange={([v]) => setLive(round(v))}
+        onValueCommit={([v]) => round(v) !== value && onCommit(round(v))}
+        aria-label="Smoothing"
+      />
+      <span className="w-8 font-mono text-xs tabular-nums">{live.toFixed(2)}</span>
+    </>
+  )
+}
+
 /** Axis, smoothing and sampling for every chart on the page; sticks under the header while scrolling. */
 export function WorkspaceControls({ state, update }: { state: WsState; update: (p: Partial<WsState>) => void }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 -mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-b bg-background/90 px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
+    // Opaque background, no backdrop blur: blurring the charts underneath on every scroll frame causes jank.
+    <div className="sticky top-0 z-10 -mx-4 -mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-b bg-background px-4 py-2 md:-mx-6 md:px-6">
       <Field label="x axis" htmlFor="ctl-x">
         <Select value={state.x} onValueChange={(v) => update({ x: v as XMode })}>
           <SelectTrigger id="ctl-x" size="sm" className="h-7 w-32 bg-card text-xs">
@@ -75,16 +100,7 @@ export function WorkspaceControls({ state, update }: { state: WsState; update: (
         </Select>
       </Field>
       <Field label="smoothing">
-        <Slider
-          className="w-36"
-          value={[state.smoothing]}
-          min={0}
-          max={0.99}
-          step={0.01}
-          onValueChange={([v]) => update({ smoothing: Number(v.toFixed(2)) })}
-          aria-label="Smoothing"
-        />
-        <span className="w-8 font-mono text-xs tabular-nums">{state.smoothing.toFixed(2)}</span>
+        <SmoothingSlider key={state.smoothing} value={state.smoothing} onCommit={(v) => update({ smoothing: v })} />
       </Field>
       <Field label="points" htmlFor="ctl-points">
         <PointsInput key={state.maxPoints} value={state.maxPoints} onCommit={(n) => update({ maxPoints: n })} />

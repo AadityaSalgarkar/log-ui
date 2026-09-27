@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useParams } from "react-router"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
@@ -8,20 +9,20 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { useProject } from "@/lib/project-context"
+import { runsRevision, useProject } from "@/lib/project-context"
 
 export default function ViewPage() {
   const { project, colors, selected, views, runs } = useProject()
+  const revision = useMemo(() => runsRevision(runs, selected), [runs, selected])
   const { viewId = "" } = useParams()
   const [state, update] = useUrlState()
   const spec = views.find((v) => v.id === viewId)
-  const anyRunning = runs.some((r) => selected.includes(r.name) && r.status === "running")
   const q = useQuery({
-    queryKey: ["view", project, viewId, [...selected].sort(), state.metric, state.point],
+    queryKey: ["view", project, viewId, [...selected].sort(), state.metric, state.point, revision], // refetch on new rows
     queryFn: () => api.view(project, viewId, { runs: selected, metric: state.metric, point: state.point }),
     enabled: selected.length > 0 && !!viewId,
     placeholderData: keepPreviousData,
-    refetchInterval: anyRunning ? 10_000 : false,
+    staleTime: Infinity,
   })
   const metric = q.data?.metric ?? state.metric ?? spec?.default_metric ?? null
   const metricLabel = spec?.metrics.find((m) => m.id === metric)?.label ?? metric ?? undefined

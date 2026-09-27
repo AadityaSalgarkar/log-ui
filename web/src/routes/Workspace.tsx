@@ -2,17 +2,16 @@ import { useCallback, useMemo, useState } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ChevronDown } from "lucide-react"
 
-import { ChartCard } from "@/components/charts/ChartCard"
+import { MetricPanel } from "@/components/charts/MetricPanel"
 import { WorkspaceControls } from "@/components/WorkspaceControls"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
-import { bandRequests } from "@/lib/chart-settings"
-import { useProject } from "@/lib/project-context"
+import { runsRevision, useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
-import type { SeriesMap } from "@/types"
+import type { SeriesMap, SeriesXY } from "@/types"
 
 const PIN_KEY = "log-ui-pins"
 
@@ -66,16 +65,16 @@ export default function WorkspacePage() {
   const [state, update] = useUrlState()
   const [pins, togglePin] = usePins(project)
   const [chartSettings, setChartSettings] = useChartSettings(project)
-  const bands = useMemo(() => bandRequests(chartSettings).metrics, [chartSettings])
+  const revision = useMemo(() => runsRevision(runs, selected), [runs, selected])
 
-  const anyRunning = runs.some((r) => selected.includes(r.name) && r.status === "running")
+  // No timer: the runs list polls cheaply, and this refetches only when a selected run has new rows (revision).
+  // Bands are fetched per chart by MetricPanel, so changing one chart's band never refetches this.
   const metricsQ = useQuery({
-    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints, bands],
-    queryFn: ({ signal }) =>
-      api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bands }, signal),
+    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints, revision],
+    queryFn: ({ signal }) => api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints }, signal),
     enabled: selected.length > 0,
     placeholderData: keepPreviousData,
-    refetchInterval: anyRunning ? 5_000 : false,
+    staleTime: Infinity,
   })
 
   const series: SeriesMap = useMemo(() => metricsQ.data?.series ?? {}, [metricsQ.data])
@@ -84,6 +83,12 @@ export default function WorkspacePage() {
     for (const per of Object.values(series)) for (const k of Object.keys(per)) set.add(k)
     return [...set]
   }, [series])
+  // One stable object per chart so MetricPanel's memo holds across unrelated re-renders.
+  const perKey = useMemo(() => {
+    const out = new Map<string, Record<string, SeriesXY | undefined>>()
+    for (const k of keys) out.set(k, Object.fromEntries(selected.map((run) => [run, series[run]?.[k]])))
+    return out
+  }, [keys, selected, series])
   // Pins persist per project, so some may name keys the selected runs never logged; show and count only the rest.
   const shownPins = useMemo(() => [...pins].filter((k) => keys.includes(k)), [pins, keys])
   const groups = useMemo(() => groupKeys(keys.filter((k) => !pins.has(k))), [keys, pins])
@@ -93,27 +98,27 @@ export default function WorkspacePage() {
     return names
   }, [groups])
 
-  const card = (key: string, hidePrefix: boolean) => {
-    const per: Record<string, { x: number[]; y: number[] } | undefined> = {}
-    for (const run of selected) per[run] = series[run]?.[key]
-    return (
-      <ChartCard
-        key={key}
-        title={key}
-        hidePrefix={hidePrefix}
-        series={per}
-        colors={colors}
-        order={selected}
-        xMode={state.x}
-        logY={state.logy}
-        syncId={`ws-${project}`}
-        pinned={pins.has(key)}
-        onPin={() => togglePin(key)}
-        settings={settingsFor(chartSettings, key)}
-        onSettingsChange={(next) => setChartSettings(key, next)}
-      />
-    )
-  }
+  const card = (key: string, hidePrefix: boolean) => (
+    <MetricPanel
+      key={key}
+      project={project}
+      metric={key}
+      series={perKey.get(key)!}
+      runs={selected}
+      colors={colors}
+      xMode={state.x}
+      logY={state.logy}
+      smoothing={state.smoothing}
+      maxPoints={state.maxPoints}
+      revision={revision}
+      syncId={`ws-${project}`}
+      hidePrefix={hidePrefix}
+      pinned={pins.has(key)}
+      onPin={togglePin}
+      settings={settingsFor(chartSettings, key)}
+      onSettingsChange={setChartSettings}
+    />
+  )
 
   return (
     <>
