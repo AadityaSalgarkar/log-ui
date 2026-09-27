@@ -7,8 +7,10 @@ import { StatCards, type Stat } from "@/components/StatCards"
 import { WorkspaceControls } from "@/components/WorkspaceControls"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
+import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
+import { bandIds } from "@/lib/chart-settings"
 import { fmtInt, fmtNum, splitKey } from "@/lib/format"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
@@ -61,11 +63,14 @@ export default function WorkspacePage() {
   const { project, runs, colors, selected, isLoading } = useProject()
   const [state, update] = useUrlState()
   const [pins, togglePin] = usePins(project)
+  const [chartSettings, setChartSettings] = useChartSettings(project)
+  const bandKeys = useMemo(() => bandIds(chartSettings, Object.keys(chartSettings)), [chartSettings])
 
   const anyRunning = runs.some((r) => selected.includes(r.name) && r.status === "running")
   const metricsQ = useQuery({
-    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints],
-    queryFn: ({ signal }) => api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints }, signal),
+    queryKey: ["metrics", project, [...selected].sort(), state.x, state.smoothing, state.maxPoints, bandKeys],
+    queryFn: ({ signal }) =>
+      api.metrics(project, { runs: selected, x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
     enabled: selected.length > 0,
     placeholderData: keepPreviousData,
     refetchInterval: state.live && anyRunning ? 5_000 : false,
@@ -103,7 +108,20 @@ export default function WorkspacePage() {
     const per: Record<string, { x: number[]; y: number[] } | undefined> = {}
     for (const run of selected) per[run] = series[run]?.[key]
     return (
-      <ChartCard key={key} title={key} series={per} colors={colors} order={selected} xMode={state.x} logY={state.logy} syncId={`ws-${project}`} pinned={pins.has(key)} onPin={() => togglePin(key)} />
+      <ChartCard
+        key={key}
+        title={key}
+        series={per}
+        colors={colors}
+        order={selected}
+        xMode={state.x}
+        logY={state.logy}
+        syncId={`ws-${project}`}
+        pinned={pins.has(key)}
+        onPin={() => togglePin(key)}
+        settings={settingsFor(chartSettings, key)}
+        onSettingsChange={(next) => setChartSettings(key, next)}
+      />
     )
   }
 

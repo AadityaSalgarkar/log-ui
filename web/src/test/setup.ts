@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest"
+import { cleanup } from "@testing-library/react"
+import { afterEach } from "vitest"
+
+afterEach(cleanup) // vitest runs without globals, so Testing Library cannot register this itself
 
 // Browser APIs missing in jsdom that Recharts and the sidebar rely on.
 class RO {

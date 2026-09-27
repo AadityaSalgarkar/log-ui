@@ -4,7 +4,9 @@ import { MemoryRouter } from "react-router"
 import { describe, expect, it, vi } from "vitest"
 
 import { LadderChart } from "@/components/charts/LadderChart"
+import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
 import { MetricChart } from "@/components/charts/MetricChart"
+import { DEFAULT_CHART_SETTINGS, axisDomain, parseLimit } from "@/lib/chart-settings"
 import { cellColor } from "@/components/charts/Heatmap"
 import { RunsTable, diffConfigKeys } from "@/components/runs/RunsTable"
 import type { Category, RunInfo } from "@/types"
@@ -66,6 +68,46 @@ describe("charts", () => {
   it("renders a metric chart with a line per run", () => {
     const { container } = render(<MetricChart series={{ alpha: { x: [1, 2, 3], y: [3, 2, 1] }, beta: { x: [1, 3], y: [1, 2] } }} colors={colors} width={500} height={200} />)
     expect(container.querySelectorAll(".recharts-line")).toHaveLength(2)
+  })
+  const banded = {
+    alpha: { x: [1, 2, 3, 4], y: [4, 3, 2, 1], band: { x: [1, 3], mean: [3.5, 1.5], std: [0.5, 0.5], min: [3, 1], max: [4, 2], window: 2 } },
+  }
+  it("draws one band area per run only when a band mode is set", () => {
+    const none = render(<MetricChart series={banded} colors={colors} width={500} height={200} />)
+    expect(none.container.querySelectorAll(".recharts-area")).toHaveLength(0)
+    none.unmount()
+    const settings = { ...DEFAULT_CHART_SETTINGS, band: "std" as const }
+    const { container } = render(<MetricChart series={banded} colors={colors} width={500} height={200} settings={settings} />)
+    expect(container.querySelectorAll(".recharts-area")).toHaveLength(1)
+    expect(container.querySelectorAll(".recharts-line")).toHaveLength(1)
+  })
+  it("fixed axis limits replace the data extent", () => {
+    expect(axisDomain(null, null, ["dataMin", "dataMax"])).toEqual({ domain: ["dataMin", "dataMax"], clip: false })
+    expect(axisDomain(2, null, ["auto", "auto"])).toEqual({ domain: [2, "auto"], clip: true })
+    const settings = { ...DEFAULT_CHART_SETTINGS, yMin: 0, yMax: 10 }
+    const { container } = render(<MetricChart series={banded} colors={colors} width={500} height={200} settings={settings} />)
+    const yTicks = [...container.querySelectorAll(".recharts-yAxis .recharts-cartesian-axis-tick-value")].map((t) => t.textContent)
+    expect(yTicks[0]).toBe("0")
+    expect(yTicks[yTicks.length - 1]).toBe("10")
+  })
+  it("settings form sets the band and commits valid limits only", async () => {
+    const onChange = vi.fn()
+    render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={onChange} bands window={4} />)
+    expect(screen.getByText(/covers 4 raw points/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("radio", { name: "min – max" }))
+    expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_CHART_SETTINGS, band: "minmax" })
+    await userEvent.type(screen.getByLabelText("y max"), "1e-3{Enter}")
+    expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_CHART_SETTINGS, yMax: 0.001 })
+    await userEvent.type(screen.getByLabelText("x min"), "abc{Enter}")
+    expect(onChange.mock.calls.every(([s]) => s.xMin === null)).toBe(true)
+    expect(screen.getByLabelText("x min")).toHaveAttribute("aria-invalid", "true")
+    expect(parseLimit("")).toBeNull()
+    expect(parseLimit(" -2.5 ")).toBe(-2.5)
+  })
+  it("hides band modes where there are no windows", () => {
+    render(<ChartSettingsForm value={DEFAULT_CHART_SETTINGS} onChange={() => {}} bands={false} />)
+    expect(screen.queryByRole("radio", { name: "mean ± std" })).not.toBeInTheDocument()
+    expect(screen.getByLabelText("x max")).toBeInTheDocument()
   })
   it("heatmap colors diverge around zero", () => {
     expect(cellColor(null, -1, 1, true)).toBe("transparent")

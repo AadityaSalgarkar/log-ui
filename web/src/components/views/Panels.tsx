@@ -3,7 +3,9 @@ import { Heatmap } from "@/components/charts/Heatmap"
 import { LadderChart } from "@/components/charts/LadderChart"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { fmtInt, fmtNum } from "@/lib/format"
+import { useProject } from "@/lib/project-context"
 import type { LinesPanel, Panel, ValuePanel } from "@/types"
 
 function PanelCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -74,12 +76,27 @@ function Stats({ panel }: { panel: ValuePanel }) {
 }
 
 function Lines({ panel, colors, order }: { panel: LinesPanel; colors: Record<string, string>; order: string[] }) {
+  const { project } = useProject()
+  const [chartSettings, setChartSettings] = useChartSettings(project)
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       {panel.keys.map((key, i) => {
         const series: Record<string, { x: number[]; y: number[] } | undefined> = {}
         for (const run of order) series[run] = panel.series[run]?.[key]
-        return <ChartCard key={key} title={panel.categories[i]?.label ?? key} subtitle={key} series={series} colors={colors} order={order} />
+        const id = `view:${key}`
+        return (
+          <ChartCard
+            key={key}
+            title={panel.categories[i]?.label ?? key}
+            subtitle={key}
+            series={series}
+            colors={colors}
+            order={order}
+            bands={false} // view panels carry every logged point, so there are no windows to summarize
+            settings={settingsFor(chartSettings, id)}
+            onSettingsChange={(next) => setChartSettings(id, next)}
+          />
+        )
       })}
     </div>
   )

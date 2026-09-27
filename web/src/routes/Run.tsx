@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useParams } from "react-router"
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { ChartCard } from "@/components/charts/ChartCard"
 import { Badge } from "@/components/ui/badge"
@@ -8,11 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
+import { bandIds, type ChartSettings } from "@/lib/chart-settings"
 import { fmtDate, fmtDuration, fmtInt, fmtNum } from "@/lib/format"
 import { useProject } from "@/lib/project-context"
 import { groupKeys } from "@/lib/series"
+
+const SYS = "system:" // chart-settings id prefix for system metric charts
 
 function KeyValueTable({ rows, filter }: { rows: [string, unknown][]; filter: string }) {
   const needle = filter.toLowerCase()
@@ -42,13 +46,26 @@ export default function RunPage() {
   const { run = "" } = useParams()
   const [state] = useUrlState()
   const [filter, setFilter] = useState("")
+  const [chartSettings, setChartSettings] = useChartSettings(project)
+  const [bandKeys, sysBandKeys] = useMemo(() => {
+    const ids = bandIds(chartSettings, Object.keys(chartSettings))
+    return [ids.filter((id) => !id.startsWith(SYS)), ids.filter((id) => id.startsWith(SYS)).map((id) => id.slice(SYS.length))]
+  }, [chartSettings])
   const detail = useQuery({ queryKey: ["run", project, run], queryFn: () => api.run(project, run), refetchInterval: state.live ? 5_000 : false })
   const metrics = useQuery({
-    queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints],
-    queryFn: ({ signal }) => api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints }, signal),
+    queryKey: ["metrics", project, [run], state.x, state.smoothing, state.maxPoints, bandKeys],
+    queryFn: ({ signal }) =>
+      api.metrics(project, { runs: [run], x: state.x, smoothing: state.smoothing, maxPoints: state.maxPoints, bandKeys }, signal),
+    placeholderData: keepPreviousData,
     refetchInterval: state.live && detail.data?.status === "running" ? 5_000 : false,
   })
-  const system = useQuery({ queryKey: ["system", project, run], queryFn: () => api.system(project, [run]), enabled: (detail.data?.system_keys.length ?? 0) > 0 })
+  const system = useQuery({
+    queryKey: ["system", project, run, sysBandKeys],
+    queryFn: () => api.system(project, [run], undefined, sysBandKeys),
+    placeholderData: keepPreviousData,
+    enabled: (detail.data?.system_keys.length ?? 0) > 0,
+  })
+  const chartProps = (id: string) => ({ settings: settingsFor(chartSettings, id), onSettingsChange: (next: ChartSettings) => setChartSettings(id, next) })
   const series = metrics.data?.series[run] ?? {}
   const groups = useMemo(() => groupKeys(Object.keys(series)), [series])
 
@@ -80,7 +97,7 @@ export default function RunPage() {
               <div className="py-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{g || "(no prefix)"}</div>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                 {keys.map((k) => (
-                  <ChartCard key={k} title={k} series={{ [run]: series[k] }} colors={colors} order={[run]} xMode={state.x} logY={state.logy} syncId={`run-${run}`} />
+                  <ChartCard key={k} title={k} series={{ [run]: series[k] }} colors={colors} order={[run]} xMode={state.x} logY={state.logy} syncId={`run-${run}`} {...chartProps(k)} />
                 ))}
               </div>
             </div>
@@ -96,7 +113,7 @@ export default function RunPage() {
         <TabsContent value="system">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {Object.keys(system.data?.series[run] ?? {}).map((k) => (
-              <ChartCard key={k} title={k} series={{ [run]: system.data?.series[run]?.[k] }} colors={colors} order={[run]} xMode="relative_time" />
+              <ChartCard key={k} title={k} series={{ [run]: system.data?.series[run]?.[k] }} colors={colors} order={[run]} xMode="relative_time" {...chartProps(SYS + k)} />
             ))}
           </div>
         </TabsContent>

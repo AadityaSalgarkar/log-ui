@@ -36,9 +36,20 @@ export interface KeyInfo {
 
 export type XMode = "step" | "relative_time" | "wall_time"
 
+/** Spread of raw values in each downsampling window (present only for keys requested via band_keys). */
+export interface SeriesBand {
+  x: number[]
+  mean: number[]
+  std: number[]
+  min: number[]
+  max: number[]
+  window: number // raw points per window
+}
+
 export interface SeriesXY {
   x: number[]
   y: number[]
+  band?: SeriesBand
 }
 
 /** run -> key -> series */

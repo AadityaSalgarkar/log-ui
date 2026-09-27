@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
-import { groupKeys, lastValue, mergeSeries } from "./series"
+import { DEFAULT_CHART_SETTINGS, bandIds, isDefault, parseChartSettings } from "./chart-settings"
+import { bandField, bandRange, groupKeys, lastValue, mergeSeries } from "./series"
 import { DEFAULTS, parseState, stateToParams } from "./url-state"
 
 describe("colors", () => {
@@ -58,12 +59,50 @@ describe("series", () => {
     expect(rows[0].a).toBeNull()
     expect(rows[1].a).toBe(5)
   })
+  const band = { x: [1, 3], mean: [2, 4], std: [0.5, 1], min: [1, 2], max: [3, 7], window: 2 }
+  it("adds band ranges per window when a band mode is chosen", () => {
+    const s = { a: { x: [1, 2, 3], y: [2, 3, 4], band } }
+    expect(mergeSeries(s)).toEqual(mergeSeries(s, false, "none"))
+    const std = mergeSeries(s, false, "std")
+    expect(std[0][bandField("a")]).toEqual([1.5, 2.5])
+    expect(std[1][bandField("a")]).toBeUndefined() // x=2 is not a window middle
+    expect(std[2][bandField("a")]).toEqual([3, 5])
+    expect(mergeSeries(s, false, "minmax")[2][bandField("a")]).toEqual([2, 7])
+    expect(bandRange(band, "minmax", 0)).toEqual([1, 3])
+  })
+  it("clips band lows to the smallest positive edge on a log axis", () => {
+    const s = { a: { x: [1, 3], y: [1, 2], band: { ...band, mean: [0.2, 4], std: [1, 1] } } }
+    const rows = mergeSeries(s, true, "std")
+    expect(rows[0][bandField("a")]).toEqual([1.2, 1.2]) // low -0.8 clipped to the smallest positive edge, 1.2
+    expect(rows[1][bandField("a")]).toEqual([3, 5])
+    const allNegative = mergeSeries({ a: { x: [1], y: [1], band: { ...band, x: [1], mean: [-5], std: [1] } } }, true, "std")
+    expect(allNegative[0][bandField("a")]).toBeUndefined()
+  })
   it("groups keys by prefix", () => {
     const g = groupKeys(["val/x/bpb", "train/loss", "loss", "train/lr"])
     expect([...g.keys()]).toEqual(["", "train", "val"])
     expect(g.get("train")).toEqual(["train/loss", "train/lr"])
     expect(lastValue({ x: [1, 2], y: [3, 4] })).toBe(4)
     expect(lastValue(undefined)).toBeNull()
+  })
+})
+
+describe("chart settings", () => {
+  it("parses stored settings tolerantly", () => {
+    const stored = JSON.stringify({ a: { band: "std", xMin: 10, yMax: 2.5 }, b: { band: "bogus", xMin: "x" }, c: 3 })
+    const m = parseChartSettings(stored)
+    expect(m.a).toEqual({ band: "std", xMin: 10, xMax: null, yMin: null, yMax: 2.5 })
+    expect(m.b).toEqual(DEFAULT_CHART_SETTINGS)
+    expect(m.c).toBeUndefined()
+    expect(parseChartSettings("not json")).toEqual({})
+    expect(parseChartSettings(null)).toEqual({})
+  })
+  it("lists band ids and detects defaults", () => {
+    const m = parseChartSettings(JSON.stringify({ z: { band: "minmax" }, a: { band: "std" }, n: { band: "none", yMin: 0 } }))
+    expect(bandIds(m, Object.keys(m))).toEqual(["a", "z"])
+    expect(bandIds(m, ["a", "missing"])).toEqual(["a"])
+    expect(isDefault(DEFAULT_CHART_SETTINGS)).toBe(true)
+    expect(isDefault(m.n)).toBe(false)
   })
 })
 

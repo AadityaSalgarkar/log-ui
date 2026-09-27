@@ -56,6 +56,7 @@ export interface MetricsQuery {
   x?: XMode
   smoothing?: number
   maxPoints?: number
+  bandKeys?: string[] // keys that also get per-window mean/std/min/max
 }
 
 export const api = {
@@ -71,9 +72,14 @@ export const api = {
       x: q.x,
       smoothing: q.smoothing,
       max_points: q.maxPoints,
+      band_keys: q.bandKeys?.join(","),
     }),
-  system: (project: string, runs: string[], maxPoints?: number) =>
-    request<MetricsResponse>(`/projects/${enc(project)}/system`, undefined, { runs: runs.join(","), max_points: maxPoints }),
+  system: (project: string, runs: string[], maxPoints?: number, bandKeys?: string[]) =>
+    request<MetricsResponse>(`/projects/${enc(project)}/system`, undefined, {
+      runs: runs.join(","),
+      max_points: maxPoints,
+      band_keys: bandKeys?.join(","),
+    }),
   views: (project: string) => request<ViewSpec[]>(`/projects/${enc(project)}/views`),
   view: (project: string, id: string, q: { runs: string[]; metric?: string | null; point?: string }) =>
     request<ResolvedView>(`/projects/${enc(project)}/views/${enc(id)}`, undefined, {
