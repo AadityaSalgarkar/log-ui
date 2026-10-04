@@ -50,6 +50,7 @@
   .cmd button { font: 500 12px var(--mono); color: var(--graphite); background: transparent; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
   .cmd button:hover { color: var(--ink); border-color: var(--graphite); }
 
+  p.alt { font-size: 14px; color: var(--graphite); margin: 12px 0 0; max-width: 760px; }
   figure.shot { margin: 40px 0 0; }
   figure.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--rule); box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.35); }
   figure.shot figcaption { font: 12px var(--mono); color: var(--graphite); margin-top: 10px; }
@@ -95,7 +96,7 @@
     <nav aria-label="Primary">
       <a href="#features">Features</a>
       <a href="#contract">Contract</a>
-      <a href="#configure">Configure</a>
+      <a href="#docker">Docker</a>
       <a href="https://github.com/AadityaSalgarkar/log-ui">GitHub</a>
     </nav>
   </header>
@@ -109,6 +110,7 @@
 <span class="c">$</span> log-ui --open</pre>
         <button type="button" id="copy" aria-label="Copy install commands">copy</button>
       </div>
+      <p class="alt">Or try it in a sandbox: build the Docker image from source and run the bundled demo, read-only, as an unprivileged user on Alpine. <a href="#docker">Docker →</a></p>
       <figure class="shot">
         <picture>
           <source srcset="assets/workspace-dark.jpg" media="(prefers-color-scheme: dark)" />
@@ -149,6 +151,31 @@ SCHEMA = {
     "system_metrics": ("id", "run_id", "run_name",
                        "timestamp", "metrics"),
 }</pre>
+      </div>
+    </section>
+
+    <section id="docker" aria-labelledby="h-docker">
+      <h2 class="path" id="h-docker"><span class="parent">log-ui</span><span class="sep">/</span>docker</h2>
+      <div class="two">
+        <div>
+          <p class="lead2">Try it without trusting it.</p>
+          <p>Build the image straight from the public source; no registry, nothing to clone. With no store mounted it serves a bundled demo. Mount yours <strong>read-only</strong> and the container still cannot write anywhere but an in-memory <code>/tmp</code>.</p>
+          <p>The image is Alpine plus a Python virtualenv: no compilers, no Node. It always runs as an unprivileged user (uid 10001); the flags shown (the defaults in <code>compose.yaml</code>) also make the filesystem immutable and drop every Linux capability. The port is published on localhost only.</p>
+        </div>
+        <pre class="block"><span class="c"># build from source</span>
+docker build -t log-ui \
+  https://github.com/AadityaSalgarkar/log-ui.git
+
+<span class="c"># bundled demo</span>
+docker run --rm -p 127.0.0.1:8765:8765 log-ui
+
+<span class="c"># your runs, read-only</span>
+docker run --rm -p 127.0.0.1:8765:8765 \
+  -v ~/.cache/huggingface/trackio:/data:ro \
+  --read-only --tmpfs /tmp \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  log-ui</pre>
       </div>
     </section>
 

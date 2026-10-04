@@ -27,6 +27,32 @@ uv run python scripts/demo_store.py /tmp/log-ui-demo
 uv run log-ui --dir /tmp/log-ui-demo --project lm-sweep
 ```
 
+## Docker
+
+Build the image yourself from the public source (no registry, nothing to clone), then run it:
+
+```
+docker build -t log-ui https://github.com/AadityaSalgarkar/log-ui.git
+
+docker run --rm -p 127.0.0.1:8765:8765 log-ui                       # bundled demo store
+docker run --rm -p 127.0.0.1:8765:8765 \
+  -v ~/.cache/huggingface/trackio:/data:ro \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
+  log-ui                                                            # your runs, read-only
+```
+
+Or, from a clone, `docker compose up` (store path via `TRACKIO_STORE`, port via `LOG_UI_PORT`). What the
+container can do, by construction:
+
+- **Read your store, never write it.** It is mounted `:ro`. A store on a read-only mount is read through a
+  private snapshot in the container's `/tmp`, so rows still in trackio's WAL file are included.
+- **Nothing else on disk.** With `--read-only` (the default in `compose.yaml`) the root filesystem is
+  immutable; only an in-memory `/tmp` is writable.
+- **Minimal surface.** Alpine plus a Python virtualenv: no compilers, no Node, no shell tools beyond
+  BusyBox. Always runs as an unprivileged user (uid 10001); `--cap-drop ALL` (default in `compose.yaml`)
+  removes every Linux capability.
+- **Local only.** The examples publish the port on `127.0.0.1`; log-ui makes no outbound connections.
+
 ## What you get
 
 - **Projects**: every trackio project in the store with its run count and last write.
@@ -55,7 +81,9 @@ all of that access lives in one module, [`log_ui/contract.py`](log_ui/contract.p
 - the trackio versions it is verified against (`TRACKIO_VERSIONS`, currently `>=0.38,<0.40`).
 
 Connections are opened with `mode=ro`, and each one's schema is checked when it opens. If a store lacks a
-declared column, log-ui returns an `unsupported trackio store` error instead of guessing. To delete, rename or
+declared column, log-ui returns an `unsupported trackio store` error instead of guessing. On a read-only
+filesystem, where SQLite cannot create the `-shm` file a WAL database needs, log-ui reads a snapshot of the
+database and its WAL from the temp directory instead. To delete, rename or
 move runs, use trackio (`trackio.Api().runs(project)`); log-ui picks up the change on its next read.
 
 ## Configuration
