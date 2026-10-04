@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Metric groups nest by key path: `loss/train/xent` sits in a "train" box inside the "loss" section, at any
+  depth. Every group collapses on its own, the open/closed state is remembered per project, and chart titles
+  drop the segments their group headers already show. Applies to the workspace and the run page.
+
 ## [0.1.0] - 2026-10-04
 
 First release.

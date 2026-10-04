@@ -63,9 +63,10 @@ container can do, by construction:
 ## What you get
 
 - **Projects**: every trackio project in the store with its run count and last write.
-- **Workspace**: pick runs in the sidebar; every logged key gets a chart, grouped by prefix (`train/…`, `val/…`),
-  with keys shown as paths (`train / loss / total`). Global smoothing (EMA), step / relative / wall-clock x-axis,
-  log y, and a free-form point budget per series. Pin charts to the top.
+- **Workspace**: pick runs in the sidebar; every logged key gets a chart, nested by its path in collapsible
+  groups (`loss/train/xent` sits in a "train" box inside "loss"; open/closed state is remembered). Global
+  smoothing (EMA), step / relative / wall-clock x-axis, log y, and a free-form point budget per series. Pin
+  charts to the top.
 - **Per-chart settings**: a mean ± std or min–max band over a trailing window of N raw points (never looks
   ahead), and fixed x/y limits. Settings persist per project in the browser.
 - **Charts**: a synced cursor across charts, a tooltip on the chart under the mouse, and a full-screen view

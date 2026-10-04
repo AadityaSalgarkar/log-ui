@@ -123,7 +123,7 @@
     <section id="features" aria-labelledby="h-features">
       <h2 class="path" id="h-features"><span class="parent">log-ui</span><span class="sep">/</span>features</h2>
       <dl class="features">
-        <div><dt>Every key, grouped</dt><dd>Each logged key gets a chart, grouped by prefix and shown as a path: <code>train / loss / total</code>.</dd></div>
+        <div><dt>Every key, nested</dt><dd>Each logged key gets a chart, nested by its path in collapsible groups: <code>loss / train / xent</code> sits in a "train" box inside "loss".</dd></div>
         <div><dt>Smoothing, axes, budget</dt><dd>EMA smoothing, step, relative or wall-clock x, log y, and how many points each series draws.</dd></div>
         <div><dt>Spread bands</dt><dd>Mean ± std or min–max over a trailing window of N raw points. It never looks ahead.</dd></div>
         <div><dt>Per-chart limits</dt><dd>Pin x and y ranges on any chart; expand any chart to full screen with a range brush.</dd></div>
