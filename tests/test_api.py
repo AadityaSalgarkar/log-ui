@@ -15,7 +15,9 @@ FIXTURES = Path(__file__).resolve().parents[1] / "web" / "fixtures"
 
 @pytest.fixture(scope="module")
 def client(store_dir):
-    settings = Settings(store_dir=store_dir, stale_seconds=3600, view_providers=["tests.test_views:demo_provider"])
+    settings = Settings(
+        store_dir=store_dir, stale_seconds=3600, view_providers=["tests.test_views:demo_provider"]
+    )
     return TestClient(create_app(settings, static_dir=store_dir / "no-static"))
 
 
@@ -58,22 +60,42 @@ def test_eval_steps_skip_ungrouped_and_train_keys(client):
 def test_keys_and_metrics(client):
     keys = client.get(f"/api/projects/{PROJECT}/keys").json()
     assert {"key": "train/loss", "prefix": "train", "n_runs": 2} in keys
-    m = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a,run-b,ghost", "keys": "train/loss,val/x/bpb", "max_points": 10}).json()
+    m = client.get(
+        f"/api/projects/{PROJECT}/metrics",
+        params={"runs": "run-a,run-b,ghost", "keys": "train/loss,val/x/bpb", "max_points": 10},
+    ).json()
     assert set(m["series"]) == {"run-a", "run-b"}
     assert set(m["series"]["run-a"]) == {"train/loss", "val/x/bpb"}
-    assert len(m["series"]["run-a"]["train/loss"]["x"]) <= 10 and m["series"]["run-a"]["train/loss"]["x"][-1] == 50
+    assert (
+        len(m["series"]["run-a"]["train/loss"]["x"]) <= 10
+        and m["series"]["run-a"]["train/loss"]["x"][-1] == 50
+    )
     assert m["series"]["run-a"]["val/x/bpb"]["x"] == [10, 20, 30, 40, 50]
-    sm = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "train/loss", "smoothing": 0.9, "max_points": 0}).json()
-    raw = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "train/loss", "max_points": 0}).json()
+    sm = client.get(
+        f"/api/projects/{PROJECT}/metrics",
+        params={"runs": "run-a", "keys": "train/loss", "smoothing": 0.9, "max_points": 0},
+    ).json()
+    raw = client.get(
+        f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "train/loss", "max_points": 0}
+    ).json()
     assert len(sm["series"]["run-a"]["train/loss"]["y"]) == 50
-    assert sm["series"]["run-a"]["train/loss"]["y"][-1] > raw["series"]["run-a"]["train/loss"]["y"][-1]  # lagging EMA of a decaying loss
-    rel = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "train/loss", "x": "relative_time"}).json()
+    assert (
+        sm["series"]["run-a"]["train/loss"]["y"][-1] > raw["series"]["run-a"]["train/loss"]["y"][-1]
+    )  # lagging EMA of a decaying loss
+    rel = client.get(
+        f"/api/projects/{PROJECT}/metrics",
+        params={"runs": "run-a", "keys": "train/loss", "x": "relative_time"},
+    ).json()
     xs = rel["series"]["run-a"]["train/loss"]["x"]
     assert xs == sorted(xs) and xs[0] >= -1
     assert client.get(f"/api/projects/{PROJECT}/metrics", params={"x": "bogus"}).status_code == 422
-    nan_series = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "val/y/bpb"}).json()
+    nan_series = client.get(
+        f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "keys": "val/y/bpb"}
+    ).json()
     assert nan_series["series"]["run-a"]["val/y/bpb"]["x"] == [20, 30, 40, 50]  # NaN at step 10 dropped
-    inc = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "since_id": m["last_id"]}).json()
+    inc = client.get(
+        f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a", "since_id": m["last_id"]}
+    ).json()
     assert inc["series"] == {} or all(not v for v in inc["series"].values())
 
 
@@ -82,9 +104,13 @@ def test_metrics_bands(client):
     m = client.get(f"/api/projects/{PROJECT}/metrics", params=params).json()["series"]["run-a"]
     assert "band" not in m["train/lr"]
     loss, band = m["train/loss"], m["train/loss"]["band"]
-    assert band["window"] == 5 and band["x"] == loss["x"] and len(band["x"]) == 50  # independent of max_points
+    assert (
+        band["window"] == 5 and band["x"] == loss["x"] and len(band["x"]) == 50
+    )  # independent of max_points
     assert all(lo <= mu <= hi for lo, mu, hi in zip(band["min"], band["mean"], band["max"]))
-    assert band["std"][0] == 0 and all(s > 0 for s in band["std"][1:])  # trailing: step 1 has nothing before it
+    assert band["std"][0] == 0 and all(
+        s > 0 for s in band["std"][1:]
+    )  # trailing: step 1 has nothing before it
     few = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "max_points": 10}).json()
     assert few["series"]["run-a"]["train/loss"]["band"]["window"] == 5  # still 5 raw points, not 50 / 10
     bad = client.get(f"/api/projects/{PROJECT}/metrics", params={**params, "bands": "train/loss"})
@@ -92,7 +118,11 @@ def test_metrics_bands(client):
 
 
 def test_large_responses_are_gzipped(client):
-    r = client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a,run-b"}, headers={"accept-encoding": "gzip"})
+    r = client.get(
+        f"/api/projects/{PROJECT}/metrics",
+        params={"runs": "run-a,run-b"},
+        headers={"accept-encoding": "gzip"},
+    )
     assert r.headers.get("content-encoding") == "gzip" and r.json()["series"]
 
 
@@ -104,7 +134,9 @@ def test_system_empty(client):
 def test_views_endpoints(client):
     views = client.get(f"/api/projects/{PROJECT}/views").json()
     assert [v["id"] for v in views] == ["ladder"]
-    v = client.get(f"/api/projects/{PROJECT}/views/ladder", params={"runs": "run-a", "metric": "bpb", "point": "last"}).json()
+    v = client.get(
+        f"/api/projects/{PROJECT}/views/ladder", params={"runs": "run-a", "metric": "bpb", "point": "last"}
+    ).json()
     ladder = v["panels"][0]
     assert list(ladder["series"]) == ["run-a"] and ladder["steps"]["run-a"] == 50
     assert ladder["series"]["run-a"][0] == pytest.approx(1.9 + 0.1 * 2.718281828 ** (-50 / 20), rel=1e-6)
@@ -112,7 +144,9 @@ def test_views_endpoints(client):
 
 
 def test_api_is_read_only(client):
-    assert client.request("DELETE", f"/api/projects/{PROJECT}/runs", json={"runs": ["run-a"]}).status_code == 405
+    assert (
+        client.request("DELETE", f"/api/projects/{PROJECT}/runs", json={"runs": ["run-a"]}).status_code == 405
+    )
     assert "run-a" in {r["name"] for r in client.get(f"/api/projects/{PROJECT}/runs").json()}
 
 
@@ -135,9 +169,13 @@ def test_write_fixtures(client):
         "projects.json": client.get("/api/projects").json(),
         "runs.json": client.get(f"/api/projects/{PROJECT}/runs").json(),
         "keys.json": client.get(f"/api/projects/{PROJECT}/keys").json(),
-        "metrics.json": client.get(f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a,run-b", "max_points": 50}).json(),
+        "metrics.json": client.get(
+            f"/api/projects/{PROJECT}/metrics", params={"runs": "run-a,run-b", "max_points": 50}
+        ).json(),
         "views.json": client.get(f"/api/projects/{PROJECT}/views").json(),
-        "view_ladder.json": client.get(f"/api/projects/{PROJECT}/views/ladder", params={"runs": "run-a,run-b"}).json(),
+        "view_ladder.json": client.get(
+            f"/api/projects/{PROJECT}/views/ladder", params={"runs": "run-a,run-b"}
+        ).json(),
         "run_detail.json": client.get(f"/api/projects/{PROJECT}/runs/run-a").json(),
     }
     for name, data in dumps.items():

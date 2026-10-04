@@ -5,7 +5,12 @@ from tests.conftest import OTHER, PROJECT
 
 
 def test_flatten():
-    assert flatten({"a": {"b": 1, "c": [1, {"d": 2}]}, "e": "x"}) == {"a.b": 1, "a.c[0]": 1, "a.c[1].d": 2, "e": "x"}
+    assert flatten({"a": {"b": 1, "c": [1, {"d": 2}]}, "e": "x"}) == {
+        "a.b": 1,
+        "a.c[0]": 1,
+        "a.c[1].d": 2,
+        "e": "x",
+    }
     assert flatten({}) == {}
 
 

@@ -27,7 +27,7 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -78,7 +78,7 @@ def parse_ts(value: str | None) -> float | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.timestamp()
 
 
@@ -180,8 +180,13 @@ class ProjectReader:
             "COUNT(*) AS n FROM metrics GROUP BY run_name"
         )
         return [
-            RunStats(r["run_name"], r["first_ts"], r["last_ts"],
-                     int(r["last_step"]) if r["last_step"] is not None else None, int(r["n"]))
+            RunStats(
+                r["run_name"],
+                r["first_ts"],
+                r["last_ts"],
+                int(r["last_step"]) if r["last_step"] is not None else None,
+                int(r["n"]),
+            )
             for r in self._conn.execute(sql)
         ]
 
@@ -192,7 +197,9 @@ class ProjectReader:
         sql = "SELECT metrics FROM metrics WHERE run_name=? ORDER BY step DESC, id DESC LIMIT ?"
         return [parse_metrics(r["metrics"]) for r in self._conn.execute(sql, (run_name, limit))]
 
-    def metric_rows(self, runs: list[str] | None, since_id: int = 0, max_rows: int | None = None) -> list[MetricRow]:
+    def metric_rows(
+        self, runs: list[str] | None, since_id: int = 0, max_rows: int | None = None
+    ) -> list[MetricRow]:
         return self._rows("metrics", "step", runs, since_id, max_rows)
 
     def system_rows(self, runs: list[str] | None, max_rows: int | None = None) -> list[MetricRow]:
@@ -211,7 +218,13 @@ class ProjectReader:
             sql += " LIMIT ?"
             params.append(max_rows)
         return [
-            (int(r["id"]), r["run_name"], int(r["step"]), parse_ts(r["timestamp"]) or 0.0, parse_metrics(r["metrics"]))
+            (
+                int(r["id"]),
+                r["run_name"],
+                int(r["step"]),
+                parse_ts(r["timestamp"]) or 0.0,
+                parse_metrics(r["metrics"]),
+            )
             for r in self._conn.execute(sql, params)
         ]
 

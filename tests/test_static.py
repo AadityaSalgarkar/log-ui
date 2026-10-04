@@ -37,4 +37,4 @@ def test_real_bundle_if_built(store_dir):
         pytest.skip("web bundle not built")
     c = TestClient(create_app(Settings(store_dir=store_dir)))
     r = c.get("/p/demo")
-    assert r.status_code == 200 and "<div id=\"root\"" in r.text
+    assert r.status_code == 200 and '<div id="root"' in r.text

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 import numpy as np
 
@@ -72,7 +73,7 @@ def downsample_indices(y: np.ndarray, max_points: int) -> np.ndarray:
     buckets = max(1, max_points // 2 - 1)
     edges = np.linspace(0, n, buckets + 1).astype(int)
     keep = {0, n - 1}
-    for a, b in zip(edges[:-1], edges[1:]):
+    for a, b in pairwise(edges):
         if b <= a:
             continue
         seg = y[a:b]
@@ -103,7 +104,9 @@ def rolling_bands(y: np.ndarray, at: np.ndarray, window: int) -> dict[str, np.nd
     # Stats come straight from each window's values: running sums of y and y^2 would lose the std of a small
     # spread on a large offset (e.g. loss 1000.0 +- 0.001) to cancellation.
     w = max(1, min(window, y.size))
-    pad = np.pad(y, (w, w), constant_values=np.nan)  # NaN edges: clipped windows are exact under nan-reductions
+    pad = np.pad(
+        y, (w, w), constant_values=np.nan
+    )  # NaN edges: clipped windows are exact under nan-reductions
     view = np.lib.stride_tricks.sliding_window_view(pad, w)
     starts = at + 1  # window [i - w + 1, i] begins at pad index i + 1
     out = {k: np.empty(at.size) for k in ("mean", "std", "min", "max")}
@@ -125,7 +128,12 @@ def _y_list(y: np.ndarray) -> list[float]:
 
 
 def to_payload(
-    s: Series, mode: str, smoothing: float, max_points: int, created_epoch: float, band_window: int | None = None
+    s: Series,
+    mode: str,
+    smoothing: float,
+    max_points: int,
+    created_epoch: float,
+    band_window: int | None = None,
 ) -> dict:
     """Plotted {x, y}; with `band_window`, also the raw-value spread in that many points around each plotted point."""
     x = x_values(s, mode, created_epoch)
@@ -148,7 +156,9 @@ def parse_bands(spec: list[str] | None) -> dict[str, int]:
     for item in spec or ():
         key, sep, w = item.rpartition(":")
         if not sep or not key or not w.isdigit() or not 1 <= int(w) <= MAX_BAND_WINDOW:
-            raise ValueError(f"band entries must be key:window with 1 <= window <= {MAX_BAND_WINDOW}, got {item!r}")
+            raise ValueError(
+                f"band entries must be key:window with 1 <= window <= {MAX_BAND_WINDOW}, got {item!r}"
+            )
         out[key] = int(w)
     return out
 

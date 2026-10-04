@@ -25,7 +25,7 @@ class Settings:
     default_project: str | None = None
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         s = cls()
         if os.environ.get("LOG_UI_PORT"):
             s.port = int(os.environ["LOG_UI_PORT"])

@@ -17,15 +17,32 @@ from log_ui.views import (
 
 def demo_provider(project: str, runs: list[RunInfo]) -> list[ViewSpec]:
     """A provider defined in this test module, loadable as tests.test_views:demo_provider."""
-    cats = [Category("y", "Y species", "test", 2, {"tier": 2}), Category("x", "X species", "train", 0, {"tier": 0})]
-    tmpl = {"bpb": "val/{category}/bpb", "excess": "val/{category}/excess",
-            "kmer": {"sub": ["val/{category}/bpb", "val/{category}/excess"]}}
+    cats = [
+        Category("y", "Y species", "test", 2, {"tier": 2}),
+        Category("x", "X species", "train", 0, {"tier": 0}),
+    ]
+    tmpl = {
+        "bpb": "val/{category}/bpb",
+        "excess": "val/{category}/excess",
+        "kmer": {"sub": ["val/{category}/bpb", "val/{category}/excess"]},
+    }
     return [
         ViewSpec(
-            id="ladder", title="Ladder", metrics=[MetricOption("bpb", "bpb"), MetricOption("excess", "excess"), MetricOption("kmer", "kmer")],
-            default_metric="bpb", best_key="val/x/bpb",
-            panels=[PanelSpec("ladder", "L", cats, tmpl), PanelSpec("table", "T", cats, tmpl), PanelSpec("lines", "C", cats, tmpl),
-                    PanelSpec("stats", "S", keys=["gen/mean_gap"])],
+            id="ladder",
+            title="Ladder",
+            metrics=[
+                MetricOption("bpb", "bpb"),
+                MetricOption("excess", "excess"),
+                MetricOption("kmer", "kmer"),
+            ],
+            default_metric="bpb",
+            best_key="val/x/bpb",
+            panels=[
+                PanelSpec("ladder", "L", cats, tmpl),
+                PanelSpec("table", "T", cats, tmpl),
+                PanelSpec("lines", "C", cats, tmpl),
+                PanelSpec("stats", "S", keys=["gen/mean_gap"]),
+            ],
         )
     ]
 
@@ -69,7 +86,11 @@ def test_resolve_view_panels():
     assert [c["id"] for c in ladder["categories"]] == ["x", "y"]  # ordered by `order`
     assert ladder["series"]["run-a"] == [1.90, 1.99] and ladder["steps"]["run-a"] == 20
     assert table["keys"] == ["val/x/bpb", "val/y/bpb"]
-    assert lines["keys"] == ["val/x/bpb", "val/y/bpb"] and lines["series"]["run-a"]["val/x/bpb"]["y"] == [1.95, 1.90, 1.92]
+    assert lines["keys"] == ["val/x/bpb", "val/y/bpb"] and lines["series"]["run-a"]["val/x/bpb"]["y"] == [
+        1.95,
+        1.90,
+        1.92,
+    ]
     assert stats["series"]["run-a"] == [0.03] and stats["categories"][0]["label"] == "gen/mean_gap"
     kmer = resolve_view(view, _series(), "kmer", "last")["panels"][0]
     assert abs(kmer["series"]["run-a"][0] - (1.92 - 0.03)) < 1e-9 and kmer["series"]["run-a"][1] is None

@@ -45,8 +45,13 @@ def _project(request: Request, project: str):
 @router.get("/health")
 def health(request: Request):
     s = _settings(request)
-    return {"ok": True, "version": __version__, "store_dir": str(s.store_dir), "trackio": TRACKIO_VERSIONS,
-            "default_project": s.default_project}
+    return {
+        "ok": True,
+        "version": __version__,
+        "store_dir": str(s.store_dir),
+        "trackio": TRACKIO_VERSIONS,
+        "default_project": s.default_project,
+    }
 
 
 @router.get("/projects")
@@ -68,7 +73,9 @@ def run_detail(request: Request, project: str, run: str):
         raise HTTPException(404, f"run {run!r} not found")
     series = build_series(store.metric_rows(project, [run])).get(run, {})
     # Eval steps: where a prefixed, non-train key was logged. Ungrouped keys (epoch, lr) are logged every step.
-    eval_steps = sorted({s for k, ser in series.items() if "/" in k and not k.startswith("train/") for s in ser.steps})
+    eval_steps = sorted(
+        {s for k, ser in series.items() if "/" in k and not k.startswith("train/") for s in ser.steps}
+    )
     sys_rows = store.system_rows(project, [run], max_rows=5000)
     sys_keys = sorted({k for *_, m in sys_rows for k in m})
     return {**asdict(info), "keys": sorted(series), "eval_steps": eval_steps, "system_keys": sys_keys}
@@ -89,7 +96,9 @@ def metrics(
     smoothing: float = Query(0.0, ge=0.0, lt=1.0),
     max_points: int | None = Query(None, ge=0),
     since_id: int = Query(0, ge=0),
-    bands: str | None = Query(None, description="key:window,... rolling mean/std/min/max over `window` raw points"),
+    bands: str | None = Query(
+        None, description="key:window,... rolling mean/std/min/max over `window` raw points"
+    ),
 ):
     store = _project(request, project)
     if x not in X_MODES:
@@ -121,7 +130,10 @@ def system(
     for per_key in series.values():  # system rows have no step; index them by order
         for s in per_key.values():
             s.steps = list(range(len(s.values)))
-    return {"x": "relative_time", "series": payloads(series, None, "relative_time", 0.0, mp, created, _bands(bands))}
+    return {
+        "x": "relative_time",
+        "series": payloads(series, None, "relative_time", 0.0, mp, created, _bands(bands)),
+    }
 
 
 @router.get("/projects/{project}/views")
@@ -132,7 +144,14 @@ def views(request: Request, project: str):
 
 
 @router.get("/projects/{project}/views/{view_id}")
-def view(request: Request, project: str, view_id: str, runs: str | None = None, metric: str | None = None, point: str = "last"):
+def view(
+    request: Request,
+    project: str,
+    view_id: str,
+    runs: str | None = None,
+    metric: str | None = None,
+    point: str = "last",
+):
     store = _project(request, project)
     all_runs = store.runs(project)
     specs = collect_views(project, all_runs, request.app.state.view_providers)

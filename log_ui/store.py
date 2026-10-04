@@ -77,7 +77,11 @@ class Store:
                 print(f"[log-ui] skipping project {name!r}: {e}")
                 continue
             path = contract.project_path(self.dir, name)
-            out.append(ProjectInfo(name=name, db_path=str(path), n_runs=n_runs, updated_at=contract.last_modified(path)))
+            out.append(
+                ProjectInfo(
+                    name=name, db_path=str(path), n_runs=n_runs, updated_at=contract.last_modified(path)
+                )
+            )
         out.sort(key=lambda x: x.updated_at, reverse=True)
         return out
 
@@ -140,7 +144,9 @@ class Store:
         with contract.open_project(self.dir, project) as reader:
             return reader.metric_rows(runs, since_id, max_rows)
 
-    def system_rows(self, project: str, runs: list[str] | None = None, max_rows: int | None = None) -> list[MetricRow]:
+    def system_rows(
+        self, project: str, runs: list[str] | None = None, max_rows: int | None = None
+    ) -> list[MetricRow]:
         with contract.open_project(self.dir, project) as reader:
             return reader.system_rows(runs, max_rows)
 

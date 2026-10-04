@@ -11,9 +11,10 @@ value is `a - b`. Missing keys yield null.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from importlib.metadata import entry_points
-from typing import Any, Callable
+from typing import Any
 
 from log_ui.series import Series
 from log_ui.store import RunInfo
@@ -78,7 +79,7 @@ def discover_providers(extra: list[str] | None = None) -> list[Provider]:
     for ep in entry_points(group="log_ui.views"):
         try:
             providers.append(ep.load())
-        except Exception as e:  # a broken plugin must not take the dashboard down
+        except Exception as e:  # noqa: BLE001 - a broken plugin must not take the dashboard down
             print(f"[log-ui] failed to load view provider {ep.name}: {e}")
     for spec in extra or []:
         providers.append(load_provider(spec))
@@ -91,7 +92,7 @@ def collect_views(project: str, runs: list[RunInfo], providers: list[Provider]) 
     for p in providers:
         try:
             specs = p(project, runs) or []
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - one failing provider must not hide the others' views
             print(f"[log-ui] view provider {p} failed for {project}: {e}")
             continue
         for s in specs:
@@ -141,7 +142,9 @@ def value_at(series: dict[str, Series], key: Any, step: int | None) -> float | N
     return s.values[i]
 
 
-def pick_step(series: dict[str, Series], point: str, best_key: str | None, consider: list[Any] | None = None) -> int | None:
+def pick_step(
+    series: dict[str, Series], point: str, best_key: str | None, consider: list[Any] | None = None
+) -> int | None:
     """'last': the last step at which any considered key was logged; 'best': argmin of best_key."""
     if point == "best" and best_key and best_key in series and len(series[best_key]):
         s = series[best_key]
@@ -178,7 +181,13 @@ def resolve_panel(
             run: {k: {"x": per_key[k].steps, "y": per_key[k].values} for k in keys if k in per_key}
             for run, per_key in runs_series.items()
         }
-        return {"type": "lines", "title": panel.title, "keys": keys, "categories": [asdict(c) for c in cats], "series": series_out}
+        return {
+            "type": "lines",
+            "title": panel.title,
+            "keys": keys,
+            "categories": [asdict(c) for c in cats],
+            "series": series_out,
+        }
     keys = [key_for(template, c.id, metric_id) for c in cats] if cats else list(panel.keys)
     labels = [c.label for c in cats] if cats else list(panel.keys)
     series_out: dict[str, list[float | None]] = {}
@@ -191,7 +200,9 @@ def resolve_panel(
         "type": panel.type,
         "title": panel.title,
         "description": panel.description,
-        "categories": [asdict(c) for c in cats] if cats else [{"id": k, "label": k, "group": "", "order": i, "meta": {}} for i, k in enumerate(labels)],
+        "categories": [asdict(c) for c in cats]
+        if cats
+        else [{"id": k, "label": k, "group": "", "order": i, "meta": {}} for i, k in enumerate(labels)],
         "keys": keys,
         "series": series_out,
         "steps": steps_out,
@@ -200,7 +211,9 @@ def resolve_panel(
     }
 
 
-def resolve_view(view: ViewSpec, runs_series: dict[str, dict[str, Series]], metric_id: str | None, point: str) -> dict:
+def resolve_view(
+    view: ViewSpec, runs_series: dict[str, dict[str, Series]], metric_id: str | None, point: str
+) -> dict:
     metric_id = metric_id or view.default_metric or (view.metrics[0].id if view.metrics else None)
     point = point if point in POINTS else "last"
     return {
