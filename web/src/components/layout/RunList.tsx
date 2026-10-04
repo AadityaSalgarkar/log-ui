@@ -36,7 +36,10 @@ export function RunList({ project, runs, colors, selected, onSelect }: RunListPr
   }
   const toggleAll = () => {
     const next = new Set(sel)
-    for (const r of visible) allVisibleSelected ? next.delete(r.name) : next.add(r.name)
+    for (const r of visible) {
+      if (allVisibleSelected) next.delete(r.name)
+      else next.add(r.name)
+    }
     onSelect(runs.map((r) => r.name).filter((n) => next.has(n)))
   }
 

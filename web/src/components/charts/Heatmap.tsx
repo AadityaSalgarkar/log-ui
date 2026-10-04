@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 
+import { cellColor } from "@/lib/colors"
 import { fmtNum } from "@/lib/format"
 import type { Category } from "@/types"
 
@@ -7,17 +8,6 @@ export interface HeatmapProps {
   categories: Category[]
   series: Record<string, (number | null)[]>
   diverging?: boolean // color around zero (gap-like metrics)
-}
-
-export function cellColor(v: number | null, lo: number, hi: number, diverging: boolean): string {
-  if (v === null || !Number.isFinite(v)) return "transparent"
-  if (diverging) {
-    const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1
-    const t = Math.max(-1, Math.min(1, v / m))
-    return t < 0 ? `hsl(215 80% 55% / ${Math.abs(t) * 0.85})` : `hsl(5 75% 55% / ${t * 0.85})`
-  }
-  const t = hi > lo ? (v - lo) / (hi - lo) : 0.5
-  return `hsl(215 80% 50% / ${0.08 + t * 0.8})`
 }
 
 export function Heatmap({ categories, series, diverging = false }: HeatmapProps) {

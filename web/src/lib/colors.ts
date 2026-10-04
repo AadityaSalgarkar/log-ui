@@ -31,3 +31,15 @@ export function colorMap(runs: Pick<RunInfo, "name" | "created_epoch">[]): Recor
 export function runColor(map: Record<string, string>, name: string): string {
   return map[name] ?? FALLBACK_COLOR
 }
+
+/** Heatmap cell fill: blue scale from lo to hi, or blue/red around zero when diverging. */
+export function cellColor(v: number | null, lo: number, hi: number, diverging: boolean): string {
+  if (v === null || !Number.isFinite(v)) return "transparent"
+  if (diverging) {
+    const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1
+    const t = Math.max(-1, Math.min(1, v / m))
+    return t < 0 ? `hsl(215 80% 55% / ${Math.abs(t) * 0.85})` : `hsl(5 75% 55% / ${t * 0.85})`
+  }
+  const t = hi > lo ? (v - lo) / (hi - lo) : 0.5
+  return `hsl(215 80% 50% / ${0.08 + t * 0.8})`
+}

@@ -11,8 +11,9 @@ import { MetricKey } from "@/components/MetricKey"
 import { PointsInput } from "@/components/WorkspaceControls"
 import { MetricChart } from "@/components/charts/MetricChart"
 import { DEFAULT_CHART_SETTINGS, axisDomain, parseLimit } from "@/lib/chart-settings"
-import { cellColor } from "@/components/charts/Heatmap"
-import { RunsTable, diffConfigKeys } from "@/components/runs/RunsTable"
+import { cellColor } from "@/lib/colors"
+import { RunsTable } from "@/components/runs/RunsTable"
+import { diffConfigKeys } from "@/lib/runs"
 import type { Category, RunInfo } from "@/types"
 
 const now = Date.now() / 1000

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { runColor } from "@/lib/colors"
 import { fmtDate, fmtDuration, fmtInt, fmtNum, timeAgo } from "@/lib/format"
+import { diffConfigKeys } from "@/lib/runs"
 import type { RunInfo } from "@/types"
 
 export interface RunsTableProps {
@@ -28,22 +29,6 @@ export interface RunsTableProps {
   onSelect: (names: string[]) => void
   summaryKeys?: string[] // summary columns to show
   maxConfigColumns?: number
-}
-
-/** Config keys whose values differ across runs, most-varying first. */
-export function diffConfigKeys(runs: RunInfo[], max = 10): string[] {
-  const values = new Map<string, Set<string>>()
-  for (const r of runs) {
-    for (const [k, v] of Object.entries(r.config)) {
-      if (!values.has(k)) values.set(k, new Set())
-      values.get(k)!.add(JSON.stringify(v))
-    }
-  }
-  return [...values.entries()]
-    .filter(([, s]) => s.size > 1)
-    .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))
-    .slice(0, max)
-    .map(([k]) => k)
 }
 
 export function RunsTable({ project, runs, colors, selected, onSelect, summaryKeys = [], maxConfigColumns = 10 }: RunsTableProps) {
@@ -66,7 +51,10 @@ export function RunsTable({ project, runs, colors, selected, onSelect, summaryKe
               checked={allShown}
               onCheckedChange={(v) => {
                 const next = new Set(sel)
-                for (const n of shown) v === true ? next.add(n) : next.delete(n)
+                for (const n of shown) {
+                  if (v === true) next.add(n)
+                  else next.delete(n)
+                }
                 onSelect(runs.map((r) => r.name).filter((n) => next.has(n)))
               }}
               aria-label="Select all shown runs"
@@ -78,7 +66,8 @@ export function RunsTable({ project, runs, colors, selected, onSelect, summaryKe
             checked={sel.has(row.original.name)}
             onCheckedChange={(v) => {
               const next = new Set(sel)
-              v === true ? next.add(row.original.name) : next.delete(row.original.name)
+              if (v === true) next.add(row.original.name)
+              else next.delete(row.original.name)
               onSelect(runs.map((r) => r.name).filter((n) => next.has(n)))
             }}
             aria-label={`Select ${row.original.name}`}
