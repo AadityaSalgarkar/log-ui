@@ -1,0 +1,31 @@
+# log-ui
+
+> log-ui is a self-hosted, read-only, wandb-style dashboard for machine-learning experiments logged with trackio. One Python process (FastAPI) serves a JSON API over trackio's per-project sqlite files and a prebuilt React app. No Node at runtime, no accounts, no cloud. MIT licensed.
+
+Key facts:
+
+- Install: `uv tool install git+https://github.com/AadityaSalgarkar/log-ui` (or `pip install git+https://github.com/AadityaSalgarkar/log-ui`). Python >= 3.11.
+- Run: `log-ui` serves `~/.cache/huggingface/trackio` at http://127.0.0.1:8765; `log-ui --dir PATH --project NAME --open` for another store.
+- log-ui never imports trackio and never writes to the store. All store access goes through `log_ui/contract.py`, which declares the tables (`configs`, `metrics`, `system_metrics`) and columns it reads and the supported trackio versions (`>=0.38,<0.40`). Connections are read-only and schema-checked; drift returns an `unsupported trackio store` error.
+- To delete, rename or move runs, use trackio itself (`trackio.Api().runs(project)`); log-ui picks up changes on its next read.
+- Bands: `GET /api/projects/{p}/metrics?bands=key:window` adds mean/std/min/max over a trailing window of `window` raw points ending at each plotted point (no look-ahead).
+- Custom panels come from view providers: `provide(project, runs) -> list[ViewSpec]`, registered under the `log_ui.views` entry-point group or passed as `--views module:function`.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/README.md): install, features, configuration (flags and `LOG_UI_*` environment variables), API table, view plugins, development
+- [Full reference](https://aadityasalgarkar.github.io/log-ui/llms-full.txt): README plus the contract, series and views module documentation in one file
+- [Project site](https://aadityasalgarkar.github.io/log-ui/): overview with screenshots
+
+## Source
+
+- [log_ui/contract.py](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/log_ui/contract.py): the only code that reads trackio's files; schema, value encoding, read-only access
+- [log_ui/api.py](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/log_ui/api.py): the read-only JSON API under `/api`
+- [log_ui/series.py](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/log_ui/series.py): series building, EMA smoothing, downsampling, trailing-window bands
+- [log_ui/views.py](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/log_ui/views.py): view provider dataclasses (ViewSpec, PanelSpec, Category) and resolution
+- [scripts/demo_store.py](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/scripts/demo_store.py): writes a synthetic trackio store to try the dashboard
+
+## Optional
+
+- [web/README.md](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/web/README.md): the React frontend (Vite, Tailwind, shadcn/ui, Recharts) and how to build it
+- [trackio](https://github.com/gradio-app/trackio): the experiment tracker whose stores log-ui reads

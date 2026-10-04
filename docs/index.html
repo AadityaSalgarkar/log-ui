@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>log-ui: a local, wandb-style dashboard for trackio</title>
+<meta name="description" content="log-ui is a self-hosted, read-only, wandb-style dashboard for experiments logged with trackio. One command, no accounts, no cloud." />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="alternate" type="text/plain" title="llms.txt" href="llms.txt" />
+<meta property="og:title" content="log-ui" />
+<meta property="og:description" content="A local, wandb-style dashboard for trackio runs." />
+<meta property="og:image" content="https://aadityasalgarkar.github.io/log-ui/assets/workspace-light.jpg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* Same tokens as the app: graphite on paper, cobalt only for links and focus. */
+  :root {
+    --paper: #f3f5f7; --sheet: #ffffff; --ink: #151a21; --graphite: #5e6875; --rule: #dde2e8; --cobalt: #2b45d8;
+    --sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #0d1015; --sheet: #141920; --ink: #e4e8ee; --graphite: #8b95a3; --rule: #252c36; --cobalt: #8397ff; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--cobalt); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; border-radius: 4px; }
+  code, pre, .mono { font-family: var(--mono); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+
+  header.top { display: flex; align-items: center; gap: 16px; padding-block: 20px; }
+  .brand { font: 600 15px var(--mono); color: var(--ink); text-decoration: none; }
+  .top nav { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+  .top nav a { color: var(--graphite); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); }
+
+  .hero { padding-block: 48px 32px; }
+  .hero h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 0; max-width: 16ch; }
+  .hero h1 .soft { color: var(--graphite); font-weight: 700; }
+  .hero p.lede { font-size: 1.15rem; color: var(--graphite); max-width: 58ch; margin: 20px 0 28px; }
+
+  .cmd { display: flex; align-items: center; gap: 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; max-width: 760px; }
+  .cmd pre { margin: 0; font-size: 14px; flex: 1; min-width: 0; white-space: pre; overflow-x: auto; } /* long URL scrolls; the button stays put */
+  .cmd button { flex: none; }
+  @media (max-width: 480px) { .top nav { gap: 12px; font-size: 13px; } .cmd pre { font-size: 12.5px; } }
+  .cmd pre .c { color: var(--graphite); }
+  .cmd button { font: 500 12px var(--mono); color: var(--graphite); background: transparent; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  .cmd button:hover { color: var(--ink); border-color: var(--graphite); }
+
+  figure.shot { margin: 40px 0 0; }
+  figure.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--rule); box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.35); }
+  figure.shot figcaption { font: 12px var(--mono); color: var(--graphite); margin-top: 10px; }
+
+  /* Section headings use the app's signature: a path, parent dimmed, leaf in ink. */
+  section { padding-block: 56px 8px; }
+  h2.path { font: 600 14px var(--mono); margin: 0 0 20px; display: flex; align-items: center; gap: 14px; }
+  h2.path .parent { color: var(--graphite); font-weight: 400; }
+  h2.path .sep { color: var(--rule); }
+  h2.path::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  .lead2 { font-size: 1.5rem; line-height: 1.3; letter-spacing: -0.015em; font-weight: 700; margin: 0 0 20px; max-width: 30ch; }
+
+  dl.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 40px; margin: 0; }
+  dl.features div { padding-block: 16px; border-top: 1px solid var(--rule); }
+  dl.features dt { font-weight: 700; margin-bottom: 4px; }
+  dl.features dd { margin: 0; color: var(--graphite); font-size: 15px; }
+  dl.features code { font-size: 13px; color: var(--ink); }
+
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .two p { color: var(--graphite); margin-top: 0; }
+  .two p.lead2 { color: var(--ink); }
+  .two p strong { color: var(--ink); }
+  pre.block { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.55; overflow-x: auto; margin: 0; }
+  pre.block .c { color: var(--graphite); }
+
+  .tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-weight: 600; color: var(--graphite); font-size: 13px; }
+  td code { font-size: 13px; white-space: nowrap; }
+
+  footer { margin-top: 72px; padding-block: 28px 48px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--graphite); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  footer a { color: var(--graphite); }
+  footer a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./">log-ui</a>
+    <nav aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#contract">Contract</a>
+      <a href="#configure">Configure</a>
+      <a href="https://github.com/AadityaSalgarkar/log-ui">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Your trackio runs, <span class="soft">charted like wandb.</span> On your machine.</h1>
+      <p class="lede">log-ui is a read-only dashboard for experiments logged with <a href="https://github.com/gradio-app/trackio">trackio</a>. Point it at a store and compare runs: grouped charts, smoothing, spread bands, a runs table that shows which configs differ. One Python process, no accounts, no cloud.</p>
+      <div class="cmd">
+        <pre id="install"><span class="c">$</span> uv tool install git+https://github.com/AadityaSalgarkar/log-ui
+<span class="c">$</span> log-ui --open</pre>
+        <button type="button" id="copy" aria-label="Copy install commands">copy</button>
+      </div>
+      <figure class="shot">
+        <picture>
+          <source srcset="assets/workspace-dark.jpg" media="(prefers-color-scheme: dark)" />
+          <img src="assets/workspace-light.jpg" width="1440" height="840" alt="The log-ui workspace: four runs of a learning-rate sweep, the pinned training loss with a mean ± std band, and grouped train charts" />
+        </picture>
+        <figcaption>A learning-rate sweep from <code>scripts/demo_store.py</code>: the training loss is pinned and shows a 50-point mean ± std band.</figcaption>
+      </figure>
+    </div>
+
+    <section id="features" aria-labelledby="h-features">
+      <h2 class="path" id="h-features"><span class="parent">log-ui</span><span class="sep">/</span>features</h2>
+      <dl class="features">
+        <div><dt>Every key, grouped</dt><dd>Each logged key gets a chart, grouped by prefix and shown as a path: <code>train / loss / total</code>.</dd></div>
+        <div><dt>Smoothing, axes, budget</dt><dd>EMA smoothing, step, relative or wall-clock x, log y, and how many points each series draws.</dd></div>
+        <div><dt>Spread bands</dt><dd>Mean ± std or min–max over a trailing window of N raw points. It never looks ahead.</dd></div>
+        <div><dt>Per-chart limits</dt><dd>Pin x and y ranges on any chart; expand any chart to full screen with a range brush.</dd></div>
+        <div><dt>Runs that differ</dt><dd>The runs table shows only the config columns that vary across runs, so sweeps read at a glance.</dd></div>
+        <div><dt>Views as plugins</dt><dd>Ladders, heatmaps and tables declared in Python for comparisons wandb needs custom panels for.</dd></div>
+      </dl>
+    </section>
+
+    <section id="contract" aria-labelledby="h-contract">
+      <h2 class="path" id="h-contract"><span class="parent">log-ui</span><span class="sep">/</span>contract</h2>
+      <div class="two">
+        <div>
+          <p class="lead2">Read-only, through one fixed contract.</p>
+          <p>log-ui never imports trackio and never writes to its store. Everything it reads goes through <a href="https://github.com/AadityaSalgarkar/log-ui/blob/main/log_ui/contract.py"><code>log_ui/contract.py</code></a>, which declares <strong>the files, tables and columns</strong> it uses and the trackio versions it is verified against.</p>
+          <p>Each sqlite connection opens with <code>mode=ro</code> and checks the schema first. A store that drifted gets a clear <code>unsupported trackio store</code> error, never a silently wrong chart.</p>
+        </div>
+        <pre class="block"><span class="c"># log_ui/contract.py</span>
+TRACKIO_VERSIONS = ">=0.38,&lt;0.40"
+
+SCHEMA = {
+    "configs": ("id", "run_id", "run_name",
+                "config", "created_at"),
+    "metrics": ("id", "run_id", "run_name",
+                "step", "timestamp", "metrics"),
+    "system_metrics": ("id", "run_id", "run_name",
+                       "timestamp", "metrics"),
+}</pre>
+      </div>
+    </section>
+
+    <section id="configure" aria-labelledby="h-configure">
+      <h2 class="path" id="h-configure"><span class="parent">log-ui</span><span class="sep">/</span>configure</h2>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Flag</th><th>Environment</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td><code>--dir</code></td><td><code>LOG_UI_DIR</code>, then <code>TRACKIO_DIR</code></td><td><code>~/.cache/huggingface/trackio</code></td></tr>
+            <tr><td><code>--port</code></td><td><code>LOG_UI_PORT</code></td><td><code>8765</code></td></tr>
+            <tr><td><code>--host</code></td><td><code>LOG_UI_HOST</code></td><td><code>127.0.0.1</code></td></tr>
+            <tr><td><code>--project</code></td><td><code>LOG_UI_PROJECT</code></td><td>the project list</td></tr>
+            <tr><td><code>--views module:function</code></td><td><code>LOG_UI_VIEWS</code></td><td>entry points in <code>log_ui.views</code></td></tr>
+            <tr><td><code>--stale-seconds</code></td><td></td><td><code>120</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color: var(--graphite); font-size: 15px">On a remote box, keep the default localhost bind and forward the port: <code>ssh -L 8765:localhost:8765 box</code>. The JSON API is documented at <code>/docs</code> on a running server.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="https://github.com/AadityaSalgarkar/log-ui">Source</a>
+    <a href="https://github.com/AadityaSalgarkar/log-ui#readme">README</a>
+    <a href="llms.txt">llms.txt</a>
+    <a href="llms-full.txt">llms-full.txt</a>
+  </footer>
+</div>
+<script>
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const text = "uv tool install git+https://github.com/AadityaSalgarkar/log-ui\nlog-ui --open"
+    try {
+      await navigator.clipboard.writeText(text)
+      e.target.textContent = "copied"
+    } catch {
+      e.target.textContent = "select + copy"
+    }
+    setTimeout(() => (e.target.textContent = "copy"), 1600)
+  })
+</script>
+</body>
+</html>
