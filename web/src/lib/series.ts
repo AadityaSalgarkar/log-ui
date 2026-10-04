@@ -1,4 +1,5 @@
 import type { BandMode } from "@/lib/chart-settings"
+import type { LineStyle } from "@/lib/key-plots"
 import type { SeriesBand, SeriesXY } from "@/types"
 
 export type Row = { x: number } & Record<string, number | null | [number, number]>
@@ -44,23 +45,50 @@ export function mergeSeries(series: Record<string, SeriesXY | undefined>, logY =
   return [...byX.values()].sort((a, b) => a.x - b.x)
 }
 
-/** What Recharts passes a tooltip per series. `value` is a [low, high] pair for band areas, not a number. */
-export interface TooltipPayloadItem {
-  name?: string
-  dataKey?: unknown
-  value?: unknown
-  color?: string
+/** One drawn line. Without explicit lines, a chart draws one solid line per run (series keyed by run). */
+export interface LineSpec {
+  id: string // key into the chart's series
+  color: string
+  label: string // tooltip / legend text, e.g. the metric
+  group?: string // tooltip groups rows by this, e.g. the run
+  style?: LineStyle
 }
 
 /**
- * Run lines only, highest first. Recharts hands band areas to the tooltip despite tooltipType="none", with a
- * [low, high] pair as the value; those must never reach number formatting.
+ * The logged point nearest to `x`, by binary search over the series' sorted x. Never extrapolates: outside the
+ * series' own range (a run that ended earlier, a metric that starts later) there is no value.
  */
-export function tooltipItems(payload: TooltipPayloadItem[]): (TooltipPayloadItem & { value: number })[] {
-  return payload
-    .filter((p): p is TooltipPayloadItem & { value: number } => typeof p.value === "number" && Number.isFinite(p.value))
-    .filter((p) => !String(p.dataKey ?? p.name ?? "").endsWith(bandField("")))
-    .sort((a, b) => b.value - a.value)
+export function nearestPoint(s: SeriesXY | undefined, x: number): { x: number; y: number } | null {
+  if (!s || s.x.length === 0 || x < s.x[0] || x > s.x[s.x.length - 1]) return null
+  let lo = 0
+  let hi = s.x.length - 1
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1
+    if (s.x[mid] <= x) lo = mid
+    else hi = mid
+  }
+  const i = Math.abs(s.x[hi] - x) < Math.abs(x - s.x[lo]) ? hi : lo
+  return { x: s.x[i], y: s.y[i] }
+}
+
+export interface TooltipRow extends LineSpec {
+  value: number
+  at: number // x of the value shown
+  exact: boolean // logged exactly at the cursor; otherwise the nearest point, shown with its x
+}
+
+/**
+ * One row per line with a value near the cursor. Lines logged at different steps (train every step, val every
+ * 100) or downsampled to different points still show, at their nearest logged point. Grouped charts (key plots)
+ * keep line order; plain charts sort highest first.
+ */
+export function tooltipRows(lines: LineSpec[], series: Record<string, SeriesXY | undefined>, x: number): TooltipRow[] {
+  const rows: TooltipRow[] = []
+  for (const line of lines) {
+    const p = nearestPoint(series[line.id], x)
+    if (p && Number.isFinite(p.y)) rows.push({ ...line, value: p.y, at: p.x, exact: p.x === x })
+  }
+  return lines.some((l) => l.group !== undefined) ? rows : rows.sort((a, b) => b.value - a.value)
 }
 
 /** One group of metric keys: `path` is its key prefix ("loss/train"), `depth` how many segments that is. */

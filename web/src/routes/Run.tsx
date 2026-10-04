@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ChartCard } from "@/components/charts/ChartCard"
 import { MetricPanel } from "@/components/charts/MetricPanel"
 import { KeyGroups } from "@/components/KeyGroups"
+import { KeyPlotsSection } from "@/components/KeyPlotsSection"
 import { RunSwatch } from "@/components/RunSwatch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useGroupState } from "@/hooks/use-group-state"
+import { useKeyPlotHandlers, useKeyPlots } from "@/hooks/use-key-plots"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { SYSTEM_ID, bandRequests, type ChartSettings } from "@/lib/chart-settings"
@@ -73,7 +75,10 @@ export default function RunPage() {
     return new Map(Object.keys(series).map((k) => [k, { [run]: series[k] }]))
   }, [metrics.data, run])
   const tree = useMemo(() => buildKeyTree([...perKey.keys()]), [perKey])
+  const allKeys = useMemo(() => [...perKey.keys()].sort(), [perKey])
   const groupState = useGroupState(project)
+  const [plots, updatePlots] = useKeyPlots(project) // the same key plots as the workspace, for this run
+  const { onNewPlot, onTogglePlot } = useKeyPlotHandlers(updatePlots)
 
   if (detail.isPending) return <Skeleton className="h-40" />
   if (detail.isError) return <p className="text-sm text-destructive">{(detail.error as Error).message}</p>
@@ -97,7 +102,26 @@ export default function RunPage() {
           <TabsTrigger value="summary">Summary</TabsTrigger>
           {d.system_keys.length > 0 && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
-        <TabsContent value="charts" className="pt-2">
+        <TabsContent value="charts" className="flex flex-col gap-6 pt-2">
+          <KeyPlotsSection
+            plots={plots}
+            update={updatePlots}
+            chartSettings={chartSettings}
+            onSettingsChange={setChartSettings}
+            isOpen={groupState.isOpen}
+            setOpen={groupState.setOpen}
+            project={project}
+            perKey={perKey}
+            allKeys={allKeys}
+            runs={runOnly}
+            colors={colors}
+            xMode={state.x}
+            logY={state.logy}
+            smoothing={state.smoothing}
+            maxPoints={state.maxPoints}
+            revision={revision}
+            syncId={`run-${run}`}
+          />
           <KeyGroups
             root={tree}
             isOpen={groupState.isOpen}
@@ -118,6 +142,9 @@ export default function RunPage() {
                 revision={revision}
                 syncId={`run-${run}`}
                 hideDepth={depth}
+                keyPlots={plots}
+                onNewPlot={onNewPlot}
+                onTogglePlot={onTogglePlot}
                 settings={settingsFor(chartSettings, k)}
                 onSettingsChange={setChartSettings}
               />

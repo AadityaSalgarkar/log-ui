@@ -13,15 +13,21 @@ import {
   YAxis,
 } from "recharts"
 
+import { LineStyleSample, MarkerShape } from "@/components/charts/LineStyleSample"
 import { RunSwatch } from "@/components/RunSwatch"
 import { DEFAULT_CHART_SETTINGS, axisDomain, type ChartSettings } from "@/lib/chart-settings"
 import { runColor } from "@/lib/colors"
-import { fmtDuration, fmtNum, fmtTick } from "@/lib/format"
-import { bandField, mergeSeries, tooltipItems, type TooltipPayloadItem } from "@/lib/series"
+import { fmtDuration, fmtInt, fmtNum, fmtTick } from "@/lib/format"
+import { DASH_ARRAY, WIDTH_PX, type LineStyle } from "@/lib/key-plots"
+import { bandField, mergeSeries, tooltipRows, type LineSpec, type TooltipRow } from "@/lib/series"
+import { cn } from "@/lib/utils"
 import type { SeriesXY, XMode } from "@/types"
 
+export type { LineSpec } // defined in lib/series; without `lines`, a chart draws one solid line per run
+
 export interface MetricChartProps {
-  series: Record<string, SeriesXY | undefined> // run -> series
+  series: Record<string, SeriesXY | undefined> // line id (run, unless `lines` says otherwise) -> series
+  lines?: LineSpec[]
   colors: Record<string, string>
   xMode?: XMode
   logY?: boolean
@@ -40,35 +46,77 @@ const TICK = { fontSize: 10, fill: "var(--muted-foreground)", fontFamily: "var(-
 
 function ChartTooltip({
   active,
-  payload,
   label,
   xMode,
+  lines,
+  series,
 }: {
   active?: boolean
-  payload?: TooltipPayloadItem[]
   label?: number | string
   xMode: XMode
+  lines: LineSpec[]
+  series: Record<string, SeriesXY | undefined>
 }) {
-  if (!active || !payload?.length) return null
-  const items = tooltipItems(payload)
+  if (!active || label === undefined) return null
   const x = typeof label === "number" ? label : Number(label)
-  const head = xMode === "step" ? `step ${fmtTick(x)}` : xMode === "relative_time" ? fmtDuration(x) : new Date(x * 1000).toLocaleString()
+  const rows = tooltipRows(lines, series, x)
+  if (rows.length === 0) return null
+  // Exact steps here (ticks may round to 3 significant figures; a tooltip must not).
+  const fmtX = (v: number) => (xMode === "step" ? fmtInt(v) : xMode === "relative_time" ? fmtDuration(v) : new Date(v * 1000).toLocaleTimeString())
+  const head = xMode === "step" ? `step ${fmtInt(x)}` : xMode === "relative_time" ? fmtDuration(x) : new Date(x * 1000).toLocaleString()
+  const grouped = rows.some((r) => r.group !== undefined)
+  // Grouped (key plots): one block per run, a row per metric with its line style.
+  const groups = new Map<string, TooltipRow[]>()
+  for (const r of rows) {
+    const g = grouped ? (r.group ?? "") : ""
+    groups.set(g, [...(groups.get(g) ?? []), r])
+  }
   return (
     <div className="min-w-44 rounded-md border bg-popover px-2.5 py-2 font-mono text-[11px] shadow-lg">
       <div className="mb-1.5 border-b pb-1 text-muted-foreground">{head}</div>
-      {items.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 leading-5">
-          <RunSwatch color={p.color ?? "currentColor"} />
-          <span className="max-w-48 truncate">{p.name}</span>
-          <span className="ml-auto pl-3 font-medium tabular-nums">{fmtNum(p.value)}</span>
+      {[...groups.entries()].map(([g, groupRows]) => (
+        <div key={g} className={grouped ? "mb-1 last:mb-0" : undefined}>
+          {grouped && (
+            <div className="flex items-center gap-2 leading-5">
+              <RunSwatch color={groupRows[0].color} />
+              <span className="max-w-48 truncate font-medium">{g}</span>
+            </div>
+          )}
+          {groupRows.map((r) => (
+            <div key={r.id} className={cn("flex items-center gap-2 leading-5", grouped && "pl-5")}>
+              {grouped && r.style ? <LineStyleSample style={r.style} color={r.color} width={22} /> : <RunSwatch color={r.color} />}
+              <span className="max-w-48 truncate">{r.label}</span>
+              <span className="ml-auto pl-3 font-medium tabular-nums">{fmtNum(r.value)}</span>
+              {/* Not logged exactly here: the nearest logged point, with where it is. */}
+              <span className={cn("w-12 text-right text-[10px] text-muted-foreground tabular-nums", r.exact && "invisible")} title={r.exact ? undefined : "nearest logged point"}>
+                @{fmtX(r.at)}
+              </span>
+            </div>
+          ))}
         </div>
       ))}
     </div>
   )
 }
 
+/** Dots drawn every `every` points in a marker shape, so styled lines stay distinguishable without clutter. */
+function markerDot(style: LineStyle | undefined, color: string, every: number, lone: boolean) {
+  if (lone) return { r: 2.5, strokeWidth: 0, fill: color } // lone points would be invisible as lines
+  if (!style || style.marker === "none") return false
+  return (props: { cx?: number; cy?: number; index?: number; value?: unknown }) => {
+    const { cx, cy, index = 0, value } = props
+    if (cx === undefined || cy === undefined || value === null || value === undefined || index % every !== 0) return <g key={index} />
+    return (
+      <g key={index}>
+        <MarkerShape marker={style.marker} cx={cx} cy={cy} r={2.6} color={color} />
+      </g>
+    )
+  }
+}
+
 function MetricChartImpl({
   series,
+  lines: lineSpecs,
   colors,
   xMode = "step",
   logY = false,
@@ -82,8 +130,12 @@ function MetricChartImpl({
   order,
   settings = DEFAULT_CHART_SETTINGS,
 }: MetricChartProps) {
-  const runs = useMemo(() => order ?? Object.keys(series), [order, series])
+  const lines = useMemo<LineSpec[]>(
+    () => lineSpecs ?? (order ?? Object.keys(series)).map((run) => ({ id: run, color: runColor(colors, run), label: run })),
+    [lineSpecs, order, series, colors],
+  )
   const data = useMemo(() => mergeSeries(series, logY, settings.band), [series, logY, settings.band])
+  const markerEvery = Math.max(1, Math.round(data.length / 14))
   const xFmt = xMode === "relative_time" ? (v: number) => fmtDuration(v) : xMode === "wall_time" ? (v: number) => new Date(v * 1000).toLocaleTimeString() : fmtTick
   const xAxis = axisDomain(settings.xMin, settings.xMax, ["dataMin", "dataMax"])
   const yLow = logY && settings.yMin !== null && settings.yMin <= 0 ? null : settings.yMin // log axes need a positive floor
@@ -116,19 +168,19 @@ function MetricChartImpl({
         width={52}
       />
       {/* Synced charts share the cursor line; only the chart under the mouse draws a tooltip. */}
-      <Tooltip content={hovered ? <ChartTooltip xMode={xMode} /> : () => null} isAnimationActive={false} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "2 2" }} />
+      <Tooltip content={hovered ? <ChartTooltip xMode={xMode} lines={lines} series={series} /> : () => null} isAnimationActive={false} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "2 2" }} />
       {legend && <Legend wrapperStyle={{ fontSize: 11, fontFamily: "var(--font-mono)" }} iconType="plainline" iconSize={14} />}
       {refX !== null && refX !== undefined && <ReferenceLine x={refX} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
       {refY !== null && refY !== undefined && <ReferenceLine y={refY} stroke="var(--muted-foreground)" strokeDasharray="4 4" />}
       {settings.band !== "none" &&
-        runs.map((run) => (
+        lines.map((l) => (
           <Area
-            key={bandField(run)}
+            key={bandField(l.id)}
             type="linear"
-            dataKey={bandField(run)}
+            dataKey={bandField(l.id)}
             stroke="none"
-            fill={runColor(colors, run)}
-            fillOpacity={0.18}
+            fill={l.color}
+            fillOpacity={lines.length > 4 ? 0.1 : 0.18}
             connectNulls
             activeDot={false}
             tooltipType="none"
@@ -136,15 +188,16 @@ function MetricChartImpl({
             isAnimationActive={false}
           />
         ))}
-      {runs.map((run) => (
+      {lines.map((l) => (
         <Line
-          key={run}
+          key={l.id}
           type="linear"
-          dataKey={run}
-          name={run}
-          stroke={runColor(colors, run)}
-          strokeWidth={1.75}
-          dot={data.length <= 2 ? { r: 2.5, strokeWidth: 0, fill: runColor(colors, run) } : false} // lone points would be invisible as lines
+          dataKey={l.id}
+          name={l.label}
+          stroke={l.color}
+          strokeWidth={l.style ? WIDTH_PX[l.style.width] : 1.75}
+          strokeDasharray={l.style ? DASH_ARRAY[l.style.dash] : undefined}
+          dot={markerDot(l.style, l.color, markerEvery, data.length <= 2)}
           activeDot={{ r: 3 }}
           connectNulls
           isAnimationActive={false}

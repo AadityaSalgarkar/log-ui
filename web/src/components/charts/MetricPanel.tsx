@@ -2,8 +2,10 @@ import { memo, useMemo } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { ChartCard } from "@/components/charts/ChartCard"
+import { PinMenu } from "@/components/charts/PinMenu"
 import { api } from "@/lib/api"
 import type { ChartSettings } from "@/lib/chart-settings"
+import type { KeyPlot } from "@/lib/key-plots"
 import type { SeriesXY, XMode } from "@/types"
 
 export interface MetricPanelProps {
@@ -19,8 +21,9 @@ export interface MetricPanelProps {
   revision: string // changes when the selected runs log new rows
   syncId: string
   hideDepth?: number // leading key segments already shown by enclosing group headers
-  pinned?: boolean
-  onPin?: (metric: string) => void
+  keyPlots?: KeyPlot[] // with the two handlers below, shows the pin menu
+  onNewPlot?: (metric: string) => void
+  onTogglePlot?: (plotId: string, metric: string) => void
   settings: ChartSettings
   onSettingsChange: (metric: string, next: ChartSettings) => void
 }
@@ -60,8 +63,11 @@ function MetricPanelImpl(p: MetricPanelProps) {
       xMode={p.xMode}
       logY={p.logY}
       syncId={p.syncId}
-      pinned={p.pinned}
-      onPin={p.onPin && (() => p.onPin!(p.metric))}
+      actions={
+        p.keyPlots && p.onNewPlot && p.onTogglePlot ? (
+          <PinMenu metric={p.metric} plots={p.keyPlots} onNew={p.onNewPlot} onToggle={p.onTogglePlot} />
+        ) : undefined
+      }
       settings={p.settings}
       onSettingsChange={(next) => p.onSettingsChange(p.metric, next)}
     />

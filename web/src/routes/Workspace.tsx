@@ -1,71 +1,25 @@
-import { useCallback, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { ChevronDown } from "lucide-react"
 
 import { MetricPanel } from "@/components/charts/MetricPanel"
 import { CHART_GRID, KeyGroups } from "@/components/KeyGroups"
+import { KeyPlotsSection } from "@/components/KeyPlotsSection"
 import { WorkspaceControls } from "@/components/WorkspaceControls"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
 import { useGroupState } from "@/hooks/use-group-state"
+import { useKeyPlotHandlers, useKeyPlots } from "@/hooks/use-key-plots"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { runsRevision, useProject } from "@/lib/project-context"
 import { buildKeyTree } from "@/lib/series"
 import type { SeriesMap, SeriesXY } from "@/types"
 
-const PIN_KEY = "log-ui-pins"
-
-function usePins(project: string): [Set<string>, (key: string) => void] {
-  const storageKey = `${PIN_KEY}:${project}`
-  const [pins, setPins] = useState<Set<string>>(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem(storageKey) ?? "[]") as string[])
-    } catch {
-      return new Set()
-    }
-  })
-  const toggle = useCallback(
-    (key: string) => {
-      setPins((prev) => {
-        const next = new Set(prev)
-        if (next.has(key)) next.delete(key)
-        else next.add(key)
-        try {
-          localStorage.setItem(storageKey, JSON.stringify([...next]))
-        } catch {
-          /* ignore */
-        }
-        return next
-      })
-    },
-    [storageKey],
-  )
-  return [pins, toggle]
-}
-
-
-/** The pinned section: same look as a top-level metric group, never nested. */
-function Section({ title, count, defaultOpen, children }: { title: string; count: number; defaultOpen: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group/section flex w-full items-center gap-3 rounded-md text-left">
-        <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
-        <span className="text-xl font-bold tracking-tight lowercase group-hover/section:text-primary">{title || "ungrouped"}</span>
-        <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
-        <span className="h-px flex-1 bg-rule" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-3">{open && children}</CollapsibleContent>
-    </Collapsible>
-  )
-}
-
 export default function WorkspacePage() {
   const { project, runs, colors, selected, isLoading } = useProject()
   const [state, update] = useUrlState()
-  const [pins, togglePin] = usePins(project)
+  const [plots, updatePlots] = useKeyPlots(project)
+  const { onNewPlot, onTogglePlot } = useKeyPlotHandlers(updatePlots)
   const [chartSettings, setChartSettings] = useChartSettings(project)
   const revision = useMemo(() => runsRevision(runs, selected), [runs, selected])
 
@@ -91,9 +45,9 @@ export default function WorkspacePage() {
     for (const k of keys) out.set(k, Object.fromEntries(selected.map((run) => [run, series[run]?.[k]])))
     return out
   }, [keys, selected, series])
-  // Pins persist per project, so some may name keys the selected runs never logged; show and count only the rest.
-  const shownPins = useMemo(() => [...pins].filter((k) => keys.includes(k)), [pins, keys])
-  const tree = useMemo(() => buildKeyTree(keys.filter((k) => !pins.has(k))), [keys, pins])
+  // Metrics in key plots also stay in their groups: key plots are an extra view on top.
+  const tree = useMemo(() => buildKeyTree(keys), [keys])
+  const allKeys = useMemo(() => [...keys].sort(), [keys])
   const groupState = useGroupState(project)
 
   const card = (key: string, hideDepth: number) => (
@@ -111,8 +65,9 @@ export default function WorkspacePage() {
       revision={revision}
       syncId={`ws-${project}`}
       hideDepth={hideDepth}
-      pinned={pins.has(key)}
-      onPin={togglePin}
+      keyPlots={plots}
+      onNewPlot={onNewPlot}
+      onTogglePlot={onTogglePlot}
       settings={settingsFor(chartSettings, key)}
       onSettingsChange={setChartSettings}
     />
@@ -133,11 +88,25 @@ export default function WorkspacePage() {
         <p className="text-sm text-destructive">Could not load metrics: {(metricsQ.error as Error).message}</p>
       ) : (
         <div className="flex flex-col gap-6">
-          {shownPins.length > 0 && (
-            <Section title="pinned" count={shownPins.length} defaultOpen>
-              <div className={CHART_GRID}>{shownPins.map((k) => card(k, 0))}</div>
-            </Section>
-          )}
+          <KeyPlotsSection
+            plots={plots}
+            update={updatePlots}
+            chartSettings={chartSettings}
+            onSettingsChange={setChartSettings}
+            isOpen={groupState.isOpen}
+            setOpen={groupState.setOpen}
+            project={project}
+            perKey={perKey}
+            allKeys={allKeys}
+            runs={selected}
+            colors={colors}
+            xMode={state.x}
+            logY={state.logy}
+            smoothing={state.smoothing}
+            maxPoints={state.maxPoints}
+            revision={revision}
+            syncId={`ws-${project}`}
+          />
           <KeyGroups root={tree} chart={card} isOpen={groupState.isOpen} setOpen={groupState.setOpen} />
           {keys.length === 0 && <p className="text-sm text-muted-foreground">The selected runs have not logged any metrics yet.</p>}
         </div>

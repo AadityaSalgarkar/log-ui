@@ -1,5 +1,5 @@
-import { memo, useState } from "react"
-import { Maximize2, Pin, PinOff, SlidersHorizontal } from "lucide-react"
+import { memo, useState, type ReactNode } from "react"
+import { Maximize2, SlidersHorizontal } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils"
 export interface ChartCardProps extends Omit<MetricChartProps, "height" | "brush" | "legend"> {
   title: string
   subtitle?: string
-  pinned?: boolean
-  onPin?: () => void
+  heading?: ReactNode // replaces the key-path title in the card header (key plots: an editable name)
+  actions?: ReactNode // extra header buttons, before settings (e.g. the pin menu)
+  footer?: ReactNode // under the header, in the card and the expanded view (key plots: the metric legend)
   onSettingsChange?: (next: ChartSettings) => void // settings are read-only without it
   bands?: boolean // offer band modes (needs band data from the API)
   hideDepth?: number // leading key segments already shown by enclosing group headers
@@ -24,7 +25,7 @@ export interface ChartCardProps extends Omit<MetricChartProps, "height" | "brush
 
 const BAND_LABEL = { none: "", std: "mean ± std", minmax: "min – max" } as const
 
-function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hideDepth = 0, className, ...chart }: ChartCardProps) {
+function ChartCardImpl({ title, subtitle, heading, actions, footer, onSettingsChange, bands = true, hideDepth = 0, className, ...chart }: ChartCardProps) {
   const [open, setOpen] = useState(false)
   const settings = chart.settings ?? DEFAULT_CHART_SETTINGS
   // The API caps the window at each run's length, so short runs can use fewer points than the setting.
@@ -38,14 +39,10 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
     <div className={cn("group relative flex flex-col rounded-lg border bg-card px-3 pt-2.5 pb-2 transition-colors hover:border-input", className)}>
       <div className="mb-1.5 flex min-h-6 items-center gap-1">
         <div className="flex min-w-0 flex-1 flex-col">
-          <MetricKey name={title} hideDepth={hideDepth} className="text-[13px]" />
+          {heading ?? <MetricKey name={title} hideDepth={hideDepth} className="text-[13px]" />}
           {(subtitle || note) && <div className="truncate font-mono text-[10px] text-muted-foreground">{[subtitle, note].filter(Boolean).join(" · ")}</div>}
         </div>
-        {onPin && (
-          <Button variant="ghost" size="icon" className={cn("size-6 opacity-0 group-hover:opacity-100", pinned && "opacity-100")} onClick={onPin} title={pinned ? "Unpin" : "Pin"}>
-            {pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-          </Button>
-        )}
+        {actions}
         {onSettingsChange && (
           <Popover>
             <PopoverTrigger asChild>
@@ -68,6 +65,7 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
           <Maximize2 className="size-3.5" />
         </Button>
       </div>
+      {footer}
       <ErrorBoundary what="this chart" resetKey={chart.settings} compact>
         <MetricChart {...chart} height={200} />
       </ErrorBoundary>
@@ -80,10 +78,12 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
             </DialogTitle>
             {subtitle && <DialogDescription>{subtitle}</DialogDescription>}
           </DialogHeader>
+          {footer}
           {open && (
             <div className="min-h-0 flex-1">
               <ErrorBoundary what="this chart" resetKey={chart.settings}>
-                <MetricChart {...chart} height="fill" legend brush />
+                {/* Key plots carry their own legend (footer); the per-run legend would repeat every metric. */}
+                <MetricChart {...chart} height="fill" legend={!footer} brush />
               </ErrorBoundary>
             </div>
           )}

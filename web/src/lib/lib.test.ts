@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtInt, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
 import { DEFAULT_CHART_SETTINGS, bandIds, bandRequests, isDefault, parseChartSettings, parseWindow } from "./chart-settings"
-import { bandField, bandRange, buildKeyTree, lastValue, mergeSeries, tooltipItems } from "./series"
+import { bandField, bandRange, buildKeyTree, lastValue, mergeSeries, nearestPoint, tooltipRows } from "./series"
 import type { RunInfo } from "@/types"
 import { runsRevision } from "./project-context"
 import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
@@ -97,14 +97,31 @@ describe("series", () => {
     const allNegative = mergeSeries({ a: { x: [1], y: [1], band: { ...band, x: [1], mean: [-5], std: [1] } } }, true, "std")
     expect(allNegative[0][bandField("a")]).toBeUndefined()
   })
-  it("tooltip keeps run lines and drops band areas (whose value is a [low, high] pair)", () => {
-    const payload = [
-      { name: "a", dataKey: "a", value: 1.5, color: "#111" },
-      { name: bandField("a"), dataKey: bandField("a"), value: [1, 2], color: "#111" },
-      { name: "b", dataKey: "b", value: 2.5, color: "#222" },
-      { name: "c", dataKey: "c", value: null },
+  it("finds the nearest logged point without extrapolating", () => {
+    const s = { x: [0, 100, 200, 300], y: [4, 3, 2, 1] }
+    expect(nearestPoint(s, 100)).toEqual({ x: 100, y: 3 })
+    expect(nearestPoint(s, 140)).toEqual({ x: 100, y: 3 })
+    expect(nearestPoint(s, 160)).toEqual({ x: 200, y: 2 })
+    expect(nearestPoint(s, 300)).toEqual({ x: 300, y: 1 })
+    expect(nearestPoint(s, 301)).toBeNull() // a run that ended earlier has no value here
+    expect(nearestPoint(s, -1)).toBeNull()
+    expect(nearestPoint({ x: [], y: [] }, 5)).toBeNull()
+    expect(nearestPoint(undefined, 5)).toBeNull()
+  })
+  it("tooltip shows every line near the cursor, even when logged at different steps", () => {
+    const train = { x: [1, 2, 3, 4, 5, 6], y: [6, 5, 4, 3, 2, 1] } // every step
+    const val = { x: [2, 6], y: [5.5, 1.5] } // every few steps
+    const lines = [
+      { id: "r|train", color: "#a00", label: "train/loss", group: "r" },
+      { id: "r|val", color: "#a00", label: "val/loss", group: "r" },
     ]
-    expect(tooltipItems(payload).map((p) => p.name)).toEqual(["b", "a"])
+    const rows = tooltipRows(lines, { "r|train": train, "r|val": val }, 3)
+    expect(rows.map((r) => [r.label, r.value, r.at, r.exact])).toEqual([
+      ["train/loss", 4, 3, true],
+      ["val/loss", 5.5, 2, false], // nearest logged val point, flagged with where it is
+    ])
+    const plain = tooltipRows([{ id: "a", color: "#1", label: "a" }, { id: "b", color: "#2", label: "b" }], { a: train, b: { x: [1, 6], y: [9, 9] } }, 4)
+    expect(plain.map((r) => r.label)).toEqual(["b", "a"]) // plain charts: highest first
   })
   it("nests keys into groups by path segment", () => {
     const root = buildKeyTree(["loss/train/xent", "loss/total", "loss/train/aux", "loss/val/xent", "val/acc", "lr", "train/loss"])

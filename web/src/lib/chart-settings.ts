@@ -81,13 +81,14 @@ export function bandIds(map: ChartSettingsMap, ids: string[]): string[] {
 /** Settings ids: metric charts use the bare key; system and view charts are namespaced. */
 export const SYSTEM_ID = "system:"
 export const VIEW_ID = "view:"
+export const PLOT_ID = "plot:" // key plots fetch their own bands
 
 /** Band requests as the API's `key:window` entries, split by the endpoint that serves the key. */
 export function bandRequests(map: ChartSettingsMap): { metrics: string[]; system: string[] } {
   const ids = bandIds(map, Object.keys(map))
   const spec = (key: string, id: string) => `${key}:${map[id].window}`
   return {
-    metrics: ids.filter((id) => !id.startsWith(SYSTEM_ID) && !id.startsWith(VIEW_ID)).map((id) => spec(id, id)),
+    metrics: ids.filter((id) => ![SYSTEM_ID, VIEW_ID, PLOT_ID].some((p) => id.startsWith(p))).map((id) => spec(id, id)),
     system: ids.filter((id) => id.startsWith(SYSTEM_ID)).map((id) => spec(id.slice(SYSTEM_ID.length), id)),
   }
 }
