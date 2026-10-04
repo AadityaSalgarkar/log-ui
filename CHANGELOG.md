@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
 ### Added
 
 - Metric groups nest by key path: `loss/train/xent` sits in a "train" box inside the "loss" section, at any
@@ -33,5 +35,6 @@ First release.
   non-root user, hardened `compose.yaml`, SBOM and signed build provenance.
 - `scripts/demo_store.py` to generate a synthetic trackio store; project site with `llms.txt`.
 
-[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AadityaSalgarkar/log-ui/releases/tag/v0.1.0

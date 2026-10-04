@@ -155,8 +155,8 @@ sources. The project site lives in [`docs/`](docs/) and is published with GitHub
 
 Releases follow [semantic versioning](https://semver.org/); see [CHANGELOG.md](CHANGELOG.md) and
 [GitHub Releases](https://github.com/AadityaSalgarkar/log-ui/releases). Pin a version with
-`uv tool install git+https://github.com/AadityaSalgarkar/log-ui@v0.1.0` or `ghcr.io/aadityasalgarkar/log-ui:0.1.0`
-(`:0.1` follows the latest patch, `:latest` follows `main`).
+`uv tool install git+https://github.com/AadityaSalgarkar/log-ui@v0.2.0` or `ghcr.io/aadityasalgarkar/log-ui:0.2.0`
+(`:0.2` follows the latest patch, `:latest` follows `main`).
 
 To release: set `__version__` in `log_ui/__init__.py`, move the `Unreleased` notes in `CHANGELOG.md` under the
 new version, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. CI checks the tag matches `__version__`,
