@@ -113,7 +113,14 @@ class Store:
             out: list[RunInfo] = []
             for name in dict.fromkeys([*configs, *stats]):
                 c, s = configs.get(name), stats.get(name)
-                created_at = (c.created_at if c else "") or (s.first_ts if s else "") or ""
+                # A run starts at its config row or its first metric, whichever is earlier: trackio can write the
+                # config after buffered metrics, which made durations and relative times negative.
+                starts = [
+                    ts
+                    for ts in (c.created_at if c else None, s.first_ts if s else None)
+                    if parse_ts(ts) is not None
+                ]
+                created_at = min(starts, key=parse_ts) if starts else ""
                 last_logged = parse_ts(s.last_ts) if s else None
                 summary: dict[str, float | None] = {}
                 for metrics in reader.latest_metrics(name, SUMMARY_ROWS):  # newest first, first seen wins

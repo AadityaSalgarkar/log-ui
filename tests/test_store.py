@@ -73,6 +73,12 @@ def test_status_follows_the_clock_not_the_cache(store_dir):
     assert store.runs(PROJECT)[0].last_logged_at is not None
 
 
+def test_run_start_is_never_after_its_first_metric(store_dir):
+    # Fast runs: trackio stamps buffered metrics before it writes the config row.
+    for r in Store(store_dir).runs(PROJECT):
+        assert r.last_logged_at is not None and r.last_logged_at >= r.created_epoch, r.name
+
+
 def test_bad_project_names(store_dir):
     store = Store(store_dir)
     for bad in ("../x", "a/b", ".hidden", ""):
