@@ -5,6 +5,23 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Key plots replace pinned charts: charts at the top of the workspace and run page that overlay several metrics
+  on one y axis (e.g. `train/loss` with `val/loss`). A metric can be in any number of key plots (A+B, A+C,
+  A+D at once). Add metrics from any chart's pin menu or a plot's **+** picker; rename plots; remove metrics
+  or whole plots. Existing pins become single-metric key plots automatically.
+- Line styles for overlaid metrics while colour stays the run: 6 dash patterns, 4 sparse marker shapes and
+  3 thicknesses, assigned automatically (30 distinct before repeating) and changeable per metric from the
+  plot's legend.
+
+### Changed
+
+- Tooltips show every line's nearest logged value, marked with its step when not exactly under the cursor,
+  so metrics logged at different steps (or downsampled to different points) all appear. Steps in tooltips
+  are exact (`step 1,026`) instead of rounded.
+- A metric in a key plot stays in its group below (pinned charts used to move out of their group).
+
 ## [0.2.0] - 2026-10-04
 
 ### Added

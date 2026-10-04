@@ -65,11 +65,15 @@ container can do, by construction:
 - **Projects**: every trackio project in the store with its run count and last write.
 - **Workspace**: pick runs in the sidebar; every logged key gets a chart, nested by its path in collapsible
   groups (`loss/train/xent` sits in a "train" box inside "loss"; open/closed state is remembered). Global
-  smoothing (EMA), step / relative / wall-clock x-axis, log y, and a free-form point budget per series. Pin
-  charts to the top.
+  smoothing (EMA), step / relative / wall-clock x-axis, log y, and a free-form point budget per series.
+- **Key plots**: charts at the top that overlay several metrics on one y axis, e.g. `train/loss` with
+  `val/loss`. Add a metric from any chart's pin menu or a plot's **+** picker; a metric can be in any number of
+  key plots (A+B, A+C and A+D at once). Colour is the run; each metric gets its own line style (dash, marker,
+  thickness), assigned automatically and changeable from the plot's legend. Shown on the workspace and run pages.
 - **Per-chart settings**: a mean ± std or min–max band over a trailing window of N raw points (never looks
   ahead), and fixed x/y limits. Settings persist per project in the browser.
-- **Charts**: a synced cursor across charts, a tooltip on the chart under the mouse, and a full-screen view
+- **Charts**: a synced cursor across charts, a tooltip on the chart under the mouse (every line's nearest
+  logged value, so metrics logged at different steps still show), and a full-screen view
   with a range brush.
 - **Runs table**: status, steps, duration, the config columns that differ between runs, sorting, filtering
   and multi-select.

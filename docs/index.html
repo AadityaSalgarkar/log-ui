@@ -114,9 +114,9 @@
       <figure class="shot">
         <picture>
           <source srcset="assets/workspace-dark.jpg" media="(prefers-color-scheme: dark)" />
-          <img src="assets/workspace-light.jpg" width="1440" height="840" alt="The log-ui workspace: four runs of a learning-rate sweep, the pinned training loss with a mean ± std band, and grouped train charts" />
+          <img src="assets/workspace-light.jpg" width="1440" height="840" alt="The log-ui workspace: four runs of a learning-rate sweep, with training and validation loss overlaid in a key plot above the grouped train charts" />
         </picture>
-        <figcaption>A learning-rate sweep from <code>scripts/demo_store.py</code>: the training loss is pinned and shows a 50-point mean ± std band.</figcaption>
+        <figcaption>A learning-rate sweep from <code>scripts/demo_store.py</code>: key plots overlay training loss (solid) with validation loss (dashed), and compare the validation sets; colour is the run.</figcaption>
       </figure>
     </div>
 
@@ -126,7 +126,8 @@
         <div><dt>Every key, nested</dt><dd>Each logged key gets a chart, nested by its path in collapsible groups: <code>loss / train / xent</code> sits in a "train" box inside "loss".</dd></div>
         <div><dt>Smoothing, axes, budget</dt><dd>EMA smoothing, step, relative or wall-clock x, log y, and how many points each series draws.</dd></div>
         <div><dt>Spread bands</dt><dd>Mean ± std or min–max over a trailing window of N raw points. It never looks ahead.</dd></div>
-        <div><dt>Per-chart limits</dt><dd>Pin x and y ranges on any chart; expand any chart to full screen with a range brush.</dd></div>
+        <div><dt>Key plots</dt><dd>Overlay metrics on one y axis, <code>train/loss</code> with <code>val/loss</code>; any metric in any number of plots. Colour is the run, line style the metric.</dd></div>
+        <div><dt>Per-chart limits</dt><dd>Fix x and y ranges on any chart; expand any chart to full screen with a range brush.</dd></div>
         <div><dt>Runs that differ</dt><dd>The runs table shows only the config columns that vary across runs, so sweeps read at a glance.</dd></div>
         <div><dt>Views as plugins</dt><dd>Ladders, heatmaps and tables declared in Python for comparisons wandb needs custom panels for.</dd></div>
       </dl>
