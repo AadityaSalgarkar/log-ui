@@ -31,6 +31,21 @@ jobs:
       - name: llms-full.txt is current
         run: uv run python scripts/build_llms_full.py --check
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t log-ui .
+      - name: Demo serves under the hardened flags
+        run: |
+          docker run -d --name lu -p 127.0.0.1:8765:8765 \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges log-ui
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8765/api/projects | grep -q '"lm-sweep"'
+          curl -fsS -o /dev/null http://127.0.0.1:8765/p/lm-sweep
+          test "$(docker exec lu id -u)" = "10001"
+          docker logs lu
+
   web:
     runs-on: ubuntu-latest
     defaults:

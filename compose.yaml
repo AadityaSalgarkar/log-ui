@@ -1,0 +1,19 @@
+# docker compose up        ->  http://127.0.0.1:8765
+#
+# Serves the trackio store at TRACKIO_STORE (default: ~/.cache/huggingface/trackio), mounted read-only.
+# The container cannot write anywhere except a small in-memory /tmp, has no Linux capabilities, and the
+# port is published on localhost only.
+services:
+  log-ui:
+    build: .
+    image: log-ui
+    ports:
+      - "127.0.0.1:${LOG_UI_PORT:-8765}:8765"
+    volumes:
+      - "${TRACKIO_STORE:-~/.cache/huggingface/trackio}:/data:ro"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m # snapshots of WAL databases on read-only mounts live here
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped

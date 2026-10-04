@@ -1,0 +1,10 @@
+# Allowlist: the image is built from exactly these files.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!log_ui/
+!scripts/demo_store.py
+!docker/
+**/__pycache__
