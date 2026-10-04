@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
 ### Added
 
 - Key plots replace pinned charts: charts at the top of the workspace and run page that overlay several metrics
@@ -52,6 +54,7 @@ First release.
   non-root user, hardened `compose.yaml`, SBOM and signed build provenance.
 - `scripts/demo_store.py` to generate a synthetic trackio store; project site with `llms.txt`.
 
-[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AadityaSalgarkar/log-ui/releases/tag/v0.1.0
