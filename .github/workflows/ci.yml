@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Lint
+        run: |
+          uv run --with ruff ruff check log_ui tests scripts
+          uv run --with ruff ruff format --check log_ui tests scripts
+      - name: Test (real trackio-written stores)
+        run: uv run pytest -q
+      - name: llms-full.txt is current
+        run: uv run python scripts/build_llms_full.py --check
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Committed bundle matches the sources
+        working-directory: .
+        run: |
+          if [ -n "$(git status --porcelain -- log_ui/static)" ]; then
+            git status --short -- log_ui/static
+            echo "log_ui/static is stale: run 'cd web && npm run build' and commit the result" >&2
+            exit 1
+          fi
