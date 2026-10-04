@@ -151,6 +151,17 @@ npm run build                            # writes ../log_ui/static (committed, s
 The built app in `log_ui/static` is committed so that installing needs no Node; CI checks it matches the
 sources. The project site lives in [`docs/`](docs/) and is published with GitHub Pages.
 
+## Versions
+
+Releases follow [semantic versioning](https://semver.org/); see [CHANGELOG.md](CHANGELOG.md) and
+[GitHub Releases](https://github.com/AadityaSalgarkar/log-ui/releases). Pin a version with
+`uv tool install git+https://github.com/AadityaSalgarkar/log-ui@v0.1.0` or `ghcr.io/aadityasalgarkar/log-ui:0.1.0`
+(`:0.1` follows the latest patch, `:latest` follows `main`).
+
+To release: set `__version__` in `log_ui/__init__.py`, move the `Unreleased` notes in `CHANGELOG.md` under the
+new version, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. CI checks the tag matches `__version__`,
+creates the GitHub Release with the wheel and sdist, and publishes the image.
+
 ## Roadmap
 
 Media and table panels, artifacts, traces, alerts, sweep pages, run tags and notes, parameter importance,
