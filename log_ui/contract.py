@@ -20,10 +20,15 @@ Verified against trackio `TRACKIO_VERSIONS`. Anything not declared here is outsi
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
 import re
+import shutil
 import sqlite3
+import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -246,13 +251,50 @@ def check_schema(conn: sqlite3.Connection) -> set[str]:
     return tables
 
 
+SNAPSHOT_DIR = Path(tempfile.gettempdir()) / "log-ui-snapshots"
+_snapshot_lock = threading.Lock()
+
+
+def _snapshot(path: Path) -> Path:
+    """A private copy of a database (and its WAL) for stores on read-only filesystems, e.g. a docker `:ro` mount.
+
+    SQLite reads a WAL-mode database through a `-shm` file next to it; when the directory is read-only and no
+    `-shm` exists, even a read-only open fails. Opening with `immutable=1` would work but silently skips rows
+    still in the `-wal`. So the db and wal are copied to a temp directory and read there; the copy is refreshed
+    whenever the originals change. The store itself is never written.
+    """
+    src = path.resolve()
+    target = SNAPSHOT_DIR / hashlib.sha1(str(src).encode()).hexdigest()[:16]
+    stamp = repr(signature(src))
+    with _snapshot_lock:
+        marker = target / "signature"
+        if not (marker.is_file() and marker.read_text() == stamp):
+            target.mkdir(parents=True, exist_ok=True)
+            for suffix in ("", "-wal", "-shm"):
+                (target / f"{src.name}{suffix}").unlink(missing_ok=True)
+            shutil.copyfile(src, target / src.name)
+            wal = src.with_name(src.name + "-wal")
+            if wal.is_file() and wal.stat().st_size > 0:
+                shutil.copyfile(wal, target / wal.name)
+            marker.write_text(stamp)
+    return target / src.name
+
+
+def readable_path(path: Path) -> Path:
+    """The file to open: the store itself, or a private snapshot when SQLite could not read it in place."""
+    shm = path.with_name(path.name + "-shm")
+    if os.access(path.parent, os.W_OK) or shm.exists():
+        return path
+    return _snapshot(path)
+
+
 @contextmanager
 def open_project(store_dir: Path, project: str) -> Iterator[ProjectReader]:
     """Read-only reader for one project. KeyError if it does not exist, ContractError if its schema drifted."""
     path = project_path(store_dir, project)
     if not path.is_file():
         raise KeyError(project)
-    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=30)
+    conn = sqlite3.connect(f"{readable_path(path).resolve().as_uri()}?mode=ro", uri=True, timeout=30)
     try:
         conn.row_factory = sqlite3.Row
         try:

@@ -41,6 +41,35 @@ def test_reader_never_writes(store_dir):
     assert contract.signature(path) == before
 
 
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="root ignores file permissions, so the dir would not be read-only"
+)
+def test_reads_a_store_on_a_read_only_filesystem(store_dir, tmp_path):
+    """Like a docker `:ro` mount: no -shm can be created, yet rows still in the -wal must be read."""
+    ro = tmp_path / "ro"
+    ro.mkdir()
+    for suffix in (".db", ".db-wal"):
+        src = store_dir / f"{PROJECT}{suffix}"
+        if src.exists():
+            shutil.copy2(src, ro / src.name)
+    expected = {(c.run_name, s.n_rows) for c, s in _configs_and_stats(store_dir)}
+    before = sorted((p.name, p.stat().st_mtime_ns, p.stat().st_size) for p in ro.iterdir())
+    for f in ro.iterdir():
+        f.chmod(0o444)
+    ro.chmod(0o555)
+    try:
+        assert {(c.run_name, s.n_rows) for c, s in _configs_and_stats(ro)} == expected
+        assert sorted((p.name, p.stat().st_mtime_ns, p.stat().st_size) for p in ro.iterdir()) == before
+    finally:
+        ro.chmod(0o755)
+
+
+def _configs_and_stats(directory):
+    with contract.open_project(directory, PROJECT) as reader:
+        stats = {s.run_name: s for s in reader.run_stats()}
+        return [(c, stats[c.run_name]) for c in reader.configs()]
+
+
 def test_missing_column_raises(store_dir, tmp_path):
     shutil.copy(contract.project_path(store_dir, OTHER), tmp_path / "old.db")
     with sqlite3.connect(tmp_path / "old.db") as conn:
