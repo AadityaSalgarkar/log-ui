@@ -6,7 +6,10 @@ import { describe, expect, it, vi } from "vitest"
 import { LadderChart } from "@/components/charts/LadderChart"
 import { ChartCard } from "@/components/charts/ChartCard"
 import { ChartSettingsForm } from "@/components/charts/ChartSettingsForm"
+import { useState } from "react"
+
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { KeyGroups } from "@/components/KeyGroups"
 import { MetricKey } from "@/components/MetricKey"
 import { PointsInput } from "@/components/WorkspaceControls"
 import { MetricChart } from "@/components/charts/MetricChart"
@@ -14,6 +17,7 @@ import { DEFAULT_CHART_SETTINGS, axisDomain, parseLimit } from "@/lib/chart-sett
 import { cellColor } from "@/lib/colors"
 import { RunsTable } from "@/components/runs/RunsTable"
 import { diffConfigKeys } from "@/lib/runs"
+import { buildKeyTree } from "@/lib/series"
 import type { Category, RunInfo } from "@/types"
 
 const now = Date.now() / 1000
@@ -142,11 +146,11 @@ describe("charts", () => {
     const b = (window: number) => ({ x: [1], mean: [1], std: [0], min: [1], max: [1], window })
     const series = { alpha: { x: [1, 2], y: [1, 2], band: b(4) }, beta: { x: [1, 2], y: [2, 1], band: b(11) } }
     const settings = { ...DEFAULT_CHART_SETTINGS, band: "minmax" as const }
-    render(<ChartCard title="train/loss/total" hidePrefix series={series} colors={colors} settings={settings} />)
+    render(<ChartCard title="train/loss/total" hideDepth={1} series={series} colors={colors} settings={settings} />)
     expect(screen.getByText("min – max · 4–11-pt window")).toBeInTheDocument()
   })
   it("multi-level keys keep their inner path under the group header", () => {
-    render(<MetricKey name="train/loss/aux" hidePrefix />)
+    render(<MetricKey name="train/loss/aux" hideDepth={1} />)
     expect(screen.getByTitle("train/loss/aux")).toHaveTextContent(/^loss\/aux$/)
     expect(screen.getByText("aux")).toHaveClass("font-semibold")
   })
@@ -166,6 +170,35 @@ describe("charts", () => {
     await userEvent.clear(input)
     await userEvent.type(input, "all{Enter}")
     expect(onCommit).toHaveBeenLastCalledWith(0)
+  })
+  it("nests groups as collapsible boxes and remembers what was closed", async () => {
+    const opened = new Map<string, boolean>()
+    const Harness = () => {
+      const [, force] = useState(0)
+      return (
+        <KeyGroups
+          root={buildKeyTree(["loss/total", "loss/train/xent", "loss/train/aux", "lr"])}
+          chart={(k, depth) => <MetricKey key={k} name={k} hideDepth={depth} />}
+          isOpen={(path, fallback) => opened.get(path) ?? fallback}
+          setOpen={(path, open) => {
+            opened.set(path, open)
+            force((n) => n + 1)
+          }}
+        />
+      )
+    }
+    render(<Harness />)
+    // loss holds its direct chart, then a nested "loss / train" box whose charts show only their leaf.
+    expect(screen.getByTitle("loss/total")).toHaveTextContent(/^total$/)
+    expect(screen.getByTitle("loss/train/xent")).toHaveTextContent(/^xent$/)
+    const sub = screen.getByRole("button", { name: /loss\s*\/\s*train\s*2/ })
+    await userEvent.click(sub) // collapse the nested group only
+    expect(opened.get("loss/train")).toBe(false)
+    expect(screen.queryByTitle("loss/train/xent")).not.toBeInTheDocument()
+    expect(screen.getByTitle("loss/total")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: /^loss\s*3$/ })) // collapse the parent
+    expect(screen.queryByTitle("loss/total")).not.toBeInTheDocument()
+    expect(screen.getByTitle("lr")).toBeInTheDocument() // ungrouped keys get their own section
   })
   it("an error boundary contains a chart that throws, and the rest of the page stays", async () => {
     const Boom = () => {

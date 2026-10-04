@@ -3,14 +3,16 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ChevronDown } from "lucide-react"
 
 import { MetricPanel } from "@/components/charts/MetricPanel"
+import { CHART_GRID, KeyGroups } from "@/components/KeyGroups"
 import { WorkspaceControls } from "@/components/WorkspaceControls"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
+import { useGroupState } from "@/hooks/use-group-state"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { runsRevision, useProject } from "@/lib/project-context"
-import { groupKeys } from "@/lib/series"
+import { buildKeyTree } from "@/lib/series"
 import type { SeriesMap, SeriesXY } from "@/types"
 
 const PIN_KEY = "log-ui-pins"
@@ -43,9 +45,8 @@ function usePins(project: string): [Set<string>, (key: string) => void] {
   return [pins, toggle]
 }
 
-const GRID = "grid grid-cols-1 gap-3 pt-3 lg:grid-cols-2 2xl:grid-cols-3"
 
-/** A metric-prefix group: the prefix set large, the key count beside it, a hairline to the edge. */
+/** The pinned section: same look as a top-level metric group, never nested. */
 function Section({ title, count, defaultOpen, children }: { title: string; count: number; defaultOpen: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -56,7 +57,7 @@ function Section({ title, count, defaultOpen, children }: { title: string; count
         <span className="font-mono text-xs text-muted-foreground tabular-nums">{count}</span>
         <span className="h-px flex-1 bg-rule" />
       </CollapsibleTrigger>
-      <CollapsibleContent>{open && children}</CollapsibleContent>
+      <CollapsibleContent className="pt-3">{open && children}</CollapsibleContent>
     </Collapsible>
   )
 }
@@ -92,14 +93,10 @@ export default function WorkspacePage() {
   }, [keys, selected, series])
   // Pins persist per project, so some may name keys the selected runs never logged; show and count only the rest.
   const shownPins = useMemo(() => [...pins].filter((k) => keys.includes(k)), [pins, keys])
-  const groups = useMemo(() => groupKeys(keys.filter((k) => !pins.has(k))), [keys, pins])
-  const orderedGroups = useMemo(() => {
-    const names = [...groups.keys()]
-    names.sort((a, b) => (a === "train" ? -1 : b === "train" ? 1 : a.localeCompare(b)))
-    return names
-  }, [groups])
+  const tree = useMemo(() => buildKeyTree(keys.filter((k) => !pins.has(k))), [keys, pins])
+  const groupState = useGroupState(project)
 
-  const card = (key: string, hidePrefix: boolean) => (
+  const card = (key: string, hideDepth: number) => (
     <MetricPanel
       key={key}
       project={project}
@@ -113,7 +110,7 @@ export default function WorkspacePage() {
       maxPoints={state.maxPoints}
       revision={revision}
       syncId={`ws-${project}`}
-      hidePrefix={hidePrefix}
+      hideDepth={hideDepth}
       pinned={pins.has(key)}
       onPin={togglePin}
       settings={settingsFor(chartSettings, key)}
@@ -127,7 +124,7 @@ export default function WorkspacePage() {
       {selected.length === 0 ? (
         <p className="text-sm text-muted-foreground">Select runs in the sidebar to plot their metrics.</p>
       ) : metricsQ.isPending || (isLoading && keys.length === 0) ? (
-        <div className={GRID}>
+        <div className={CHART_GRID}>
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
@@ -138,14 +135,10 @@ export default function WorkspacePage() {
         <div className="flex flex-col gap-6">
           {shownPins.length > 0 && (
             <Section title="pinned" count={shownPins.length} defaultOpen>
-              <div className={GRID}>{shownPins.map((k) => card(k, false))}</div>
+              <div className={CHART_GRID}>{shownPins.map((k) => card(k, 0))}</div>
             </Section>
           )}
-          {orderedGroups.map((g, i) => (
-            <Section key={g} title={g} count={groups.get(g)!.length} defaultOpen={i < 2}>
-              <div className={GRID}>{groups.get(g)!.map((k) => card(k, g !== ""))}</div>
-            </Section>
-          ))}
+          <KeyGroups root={tree} chart={card} isOpen={groupState.isOpen} setOpen={groupState.setOpen} />
           {keys.length === 0 && <p className="text-sm text-muted-foreground">The selected runs have not logged any metrics yet.</p>}
         </div>
       )}

@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 import { ChartCard } from "@/components/charts/ChartCard"
 import { MetricPanel } from "@/components/charts/MetricPanel"
+import { KeyGroups } from "@/components/KeyGroups"
 import { RunSwatch } from "@/components/RunSwatch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -11,12 +12,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { settingsFor, useChartSettings } from "@/hooks/use-chart-settings"
+import { useGroupState } from "@/hooks/use-group-state"
 import { useUrlState } from "@/hooks/use-url-state"
 import { api } from "@/lib/api"
 import { SYSTEM_ID, bandRequests, type ChartSettings } from "@/lib/chart-settings"
 import { fmtDate, fmtDuration, fmtInt, fmtNum } from "@/lib/format"
 import { runsRevision, useProject } from "@/lib/project-context"
-import { groupKeys } from "@/lib/series"
+import { buildKeyTree } from "@/lib/series"
 
 
 function KeyValueTable({ rows, filter }: { rows: [string, unknown][]; filter: string }) {
@@ -70,7 +72,8 @@ export default function RunPage() {
     const series = metrics.data?.series[run] ?? {}
     return new Map(Object.keys(series).map((k) => [k, { [run]: series[k] }]))
   }, [metrics.data, run])
-  const groups = useMemo(() => groupKeys([...perKey.keys()]), [perKey])
+  const tree = useMemo(() => buildKeyTree([...perKey.keys()]), [perKey])
+  const groupState = useGroupState(project)
 
   if (detail.isPending) return <Skeleton className="h-40" />
   if (detail.isError) return <p className="text-sm text-destructive">{(detail.error as Error).message}</p>
@@ -94,37 +97,32 @@ export default function RunPage() {
           <TabsTrigger value="summary">Summary</TabsTrigger>
           {d.system_keys.length > 0 && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
-        <TabsContent value="charts" className="flex flex-col gap-6 pt-2">
-          {[...groups.entries()].map(([g, keys]) => (
-            <div key={g}>
-              <div className="flex items-center gap-3 pb-3">
-                <span className="text-xl font-bold tracking-tight lowercase">{g || "ungrouped"}</span>
-                <span className="font-mono text-xs text-muted-foreground tabular-nums">{keys.length}</span>
-                <span className="h-px flex-1 bg-rule" />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                {keys.map((k) => (
-                  <MetricPanel
-                    key={k}
-                    project={project}
-                    metric={k}
-                    series={perKey.get(k)!}
-                    runs={runOnly}
-                    colors={colors}
-                    xMode={state.x}
-                    logY={state.logy}
-                    smoothing={state.smoothing}
-                    maxPoints={state.maxPoints}
-                    revision={revision}
-                    syncId={`run-${run}`}
-                    hidePrefix={g !== ""}
-                    settings={settingsFor(chartSettings, k)}
-                    onSettingsChange={setChartSettings}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+        <TabsContent value="charts" className="pt-2">
+          <KeyGroups
+            root={tree}
+            isOpen={groupState.isOpen}
+            setOpen={groupState.setOpen}
+            defaultOpenTop={Infinity}
+            chart={(k, depth) => (
+              <MetricPanel
+                key={k}
+                project={project}
+                metric={k}
+                series={perKey.get(k)!}
+                runs={runOnly}
+                colors={colors}
+                xMode={state.x}
+                logY={state.logy}
+                smoothing={state.smoothing}
+                maxPoints={state.maxPoints}
+                revision={revision}
+                syncId={`run-${run}`}
+                hideDepth={depth}
+                settings={settingsFor(chartSettings, k)}
+                onSettingsChange={setChartSettings}
+              />
+            )}
+          />
         </TabsContent>
         <TabsContent value="config">
           <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter config" className="mb-2 h-8 w-64 text-xs" />

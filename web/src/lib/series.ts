@@ -63,16 +63,42 @@ export function tooltipItems(payload: TooltipPayloadItem[]): (TooltipPayloadItem
     .sort((a, b) => b.value - a.value)
 }
 
-/** Group metric keys by their prefix ("train", "val", ...), keys without a prefix under "". */
-export function groupKeys(keys: string[]): Map<string, string[]> {
-  const groups = new Map<string, string[]>()
-  for (const k of [...keys].sort()) {
-    const i = k.indexOf("/")
-    const prefix = i < 0 ? "" : k.slice(0, i)
-    if (!groups.has(prefix)) groups.set(prefix, [])
-    groups.get(prefix)!.push(k)
+/** One group of metric keys: `path` is its key prefix ("loss/train"), `depth` how many segments that is. */
+export interface KeyNode {
+  name: string // last segment of the path; "" for the root
+  path: string
+  depth: number
+  keys: string[] // charts directly in this group (their last segment is the chart name)
+  children: KeyNode[] // sub-groups, after the direct charts
+  total: number // charts in this group and all sub-groups
+}
+
+/**
+ * Nest keys by their path segments: `loss/train/xent` lands in group loss → train, `loss/total` directly in loss.
+ * Keys without a "/" stay on the root. Groups and keys sort alphabetically, except `train` leads the top level.
+ */
+export function buildKeyTree(keys: string[]): KeyNode {
+  const root: KeyNode = { name: "", path: "", depth: 0, keys: [], children: [], total: 0 }
+  for (const key of [...keys].sort()) {
+    const segments = key.split("/")
+    let node = root
+    for (const name of segments.slice(0, -1)) {
+      let child = node.children.find((c) => c.name === name)
+      if (!child) {
+        child = { name, path: node.path ? `${node.path}/${name}` : name, depth: node.depth + 1, keys: [], children: [], total: 0 }
+        node.children.push(child)
+      }
+      node = child
+    }
+    node.keys.push(key)
   }
-  return groups
+  const finish = (node: KeyNode): number => {
+    node.children.sort((a, b) => (node.depth === 0 && a.name === "train" ? -1 : node.depth === 0 && b.name === "train" ? 1 : a.name.localeCompare(b.name)))
+    node.total = node.keys.length + node.children.reduce((sum, c) => sum + finish(c), 0)
+    return node.total
+  }
+  finish(root)
+  return root
 }
 
 export function lastValue(s: SeriesXY | undefined): number | null {

@@ -18,7 +18,7 @@ export interface MetricPanelProps {
   maxPoints: number
   revision: string // changes when the selected runs log new rows
   syncId: string
-  hidePrefix?: boolean
+  hideDepth?: number // leading key segments already shown by enclosing group headers
   pinned?: boolean
   onPin?: (metric: string) => void
   settings: ChartSettings
@@ -53,7 +53,7 @@ function MetricPanelImpl(p: MetricPanelProps) {
   return (
     <ChartCard
       title={p.metric}
-      hidePrefix={p.hidePrefix}
+      hideDepth={p.hideDepth}
       series={series}
       colors={p.colors}
       order={p.runs}

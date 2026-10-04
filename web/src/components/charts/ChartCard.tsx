@@ -18,13 +18,13 @@ export interface ChartCardProps extends Omit<MetricChartProps, "height" | "brush
   onPin?: () => void
   onSettingsChange?: (next: ChartSettings) => void // settings are read-only without it
   bands?: boolean // offer band modes (needs band data from the API)
-  hidePrefix?: boolean // drop the key's first segment when a group header already shows it
+  hideDepth?: number // leading key segments already shown by enclosing group headers
   className?: string
 }
 
 const BAND_LABEL = { none: "", std: "mean ± std", minmax: "min – max" } as const
 
-function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hidePrefix = false, className, ...chart }: ChartCardProps) {
+function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands = true, hideDepth = 0, className, ...chart }: ChartCardProps) {
   const [open, setOpen] = useState(false)
   const settings = chart.settings ?? DEFAULT_CHART_SETTINGS
   // The API caps the window at each run's length, so short runs can use fewer points than the setting.
@@ -38,7 +38,7 @@ function ChartCardImpl({ title, subtitle, pinned, onPin, onSettingsChange, bands
     <div className={cn("group relative flex flex-col rounded-lg border bg-card px-3 pt-2.5 pb-2 transition-colors hover:border-input", className)}>
       <div className="mb-1.5 flex min-h-6 items-center gap-1">
         <div className="flex min-w-0 flex-1 flex-col">
-          <MetricKey name={title} hidePrefix={hidePrefix} className="text-[13px]" />
+          <MetricKey name={title} hideDepth={hideDepth} className="text-[13px]" />
           {(subtitle || note) && <div className="truncate font-mono text-[10px] text-muted-foreground">{[subtitle, note].filter(Boolean).join(" · ")}</div>}
         </div>
         {onPin && (

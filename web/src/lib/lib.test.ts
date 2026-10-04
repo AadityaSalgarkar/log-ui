@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { PALETTE, colorMap, runColor } from "./colors"
 import { fmtDuration, fmtInt, fmtNum, fmtTick, splitKey, timeAgo } from "./format"
 import { DEFAULT_CHART_SETTINGS, bandIds, bandRequests, isDefault, parseChartSettings, parseWindow } from "./chart-settings"
-import { bandField, bandRange, groupKeys, lastValue, mergeSeries, tooltipItems } from "./series"
+import { bandField, bandRange, buildKeyTree, lastValue, mergeSeries, tooltipItems } from "./series"
 import type { RunInfo } from "@/types"
 import { runsRevision } from "./project-context"
 import { DEFAULTS, formatPoints, parsePoints, parseState, stateToParams } from "./url-state"
@@ -106,10 +106,19 @@ describe("series", () => {
     ]
     expect(tooltipItems(payload).map((p) => p.name)).toEqual(["b", "a"])
   })
-  it("groups multi-level keys by their first segment only", () => {
-    const g = groupKeys(["train/loss/total", "train/loss/aux", "train/lr", "val/x/bpb"])
-    expect(g.get("train")).toEqual(["train/loss/aux", "train/loss/total", "train/lr"])
-    expect(g.get("val")).toEqual(["val/x/bpb"])
+  it("nests keys into groups by path segment", () => {
+    const root = buildKeyTree(["loss/train/xent", "loss/total", "loss/train/aux", "loss/val/xent", "val/acc", "lr", "train/loss"])
+    expect(root.keys).toEqual(["lr"]) // no "/" -> root level
+    expect(root.children.map((c) => c.name)).toEqual(["train", "loss", "val"]) // train first at the top level
+    const loss = root.children.find((c) => c.name === "loss")!
+    expect(loss.keys).toEqual(["loss/total"]) // direct charts
+    expect(loss.children.map((c) => [c.path, c.depth, c.keys])).toEqual([
+      ["loss/train", 2, ["loss/train/aux", "loss/train/xent"]],
+      ["loss/val", 2, ["loss/val/xent"]],
+    ])
+    expect(loss.total).toBe(4)
+    expect(root.total).toBe(7)
+    expect(buildKeyTree(["a/b/c/d"]).children[0].children[0].children[0].keys).toEqual(["a/b/c/d"]) // any depth
   })
   it("requests bands as key:window, metric and system keys to their own endpoints", () => {
     const m = parseChartSettings(
@@ -117,10 +126,7 @@ describe("series", () => {
     )
     expect(bandRequests(m)).toEqual({ metrics: ["train/loss:25"], system: ["gpu:10"] })
   })
-  it("groups keys by prefix", () => {
-    const g = groupKeys(["val/x/bpb", "train/loss", "loss", "train/lr"])
-    expect([...g.keys()]).toEqual(["", "train", "val"])
-    expect(g.get("train")).toEqual(["train/loss", "train/lr"])
+  it("reads the last value of a series", () => {
     expect(lastValue({ x: [1, 2], y: [3, 4] })).toBe(4)
     expect(lastValue(undefined)).toBeNull()
   })
