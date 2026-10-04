@@ -30,16 +30,23 @@ uv run log-ui --dir /tmp/log-ui-demo --project lm-sweep
 
 ## Docker
 
-Build the image yourself from the public source (no registry, nothing to clone), then run it:
+A prebuilt image (linux/amd64 and linux/arm64) is published from this repository's CI:
 
 ```
-docker build -t log-ui https://github.com/AadityaSalgarkar/log-ui.git
+docker run --rm -p 127.0.0.1:8765:8765 ghcr.io/aadityasalgarkar/log-ui      # bundled demo store
 
-docker run --rm -p 127.0.0.1:8765:8765 log-ui                       # bundled demo store
 docker run --rm -p 127.0.0.1:8765:8765 \
   -v ~/.cache/huggingface/trackio:/data:ro \
   --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
-  log-ui                                                            # your runs, read-only
+  ghcr.io/aadityasalgarkar/log-ui                                         # your runs, read-only
+```
+
+Check it was built by this repository's workflow (signed SLSA provenance; an SBOM is attached too), or skip
+the registry and build it yourself from source:
+
+```
+gh attestation verify oci://ghcr.io/aadityasalgarkar/log-ui:latest --owner AadityaSalgarkar
+docker build -t log-ui https://github.com/AadityaSalgarkar/log-ui.git     # then run `log-ui` instead
 ```
 
 Or, from a clone, `docker compose up` (store path via `TRACKIO_STORE`, port via `LOG_UI_PORT`). What the
