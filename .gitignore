@@ -19,9 +19,18 @@ htmlcov/
 !uv.lock
 to-delete/
 
-# Editors / OS
+# Node (the app lives in web/; see web/.gitignore)
+node_modules/
+
+# Secrets and logs
+.env
+.env.*
+*.log
+
+# Editors / OS / agents
 .DS_Store
 .idea/
 .vscode/
+.claude/settings.local.json
 
 # The built SPA in log_ui/static is committed on purpose (shipped in the wheel); see web/.gitignore for Node.

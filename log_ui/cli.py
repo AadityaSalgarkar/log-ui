@@ -13,10 +13,11 @@ from log_ui.settings import Settings
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="log-ui", description="wandb-style dashboard for trackio stores")
     p.add_argument(
-        "--dir", help="trackio store directory (default: $TRACKIO_DIR or ~/.cache/huggingface/trackio)"
+        "--dir",
+        help="trackio store directory (default: $LOG_UI_DIR, then $TRACKIO_DIR, then ~/.cache/huggingface/trackio)",
     )
-    p.add_argument("--host", default=None)
-    p.add_argument("--port", type=int, default=None)
+    p.add_argument("--host", default=None, help="interface to bind (default: 127.0.0.1, or $LOG_UI_HOST)")
+    p.add_argument("--port", type=int, default=None, help="port to serve on (default: 8765, or $LOG_UI_PORT)")
     p.add_argument("--project", default=None, help="project to open by default")
     p.add_argument(
         "--views", action="append", default=[], help="extra view provider as module:function (repeatable)"
