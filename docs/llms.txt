@@ -4,7 +4,7 @@
 
 Key facts:
 
-- Install: `uv tool install git+https://github.com/AadityaSalgarkar/log-ui` (or `pip install git+https://github.com/AadityaSalgarkar/log-ui`). Python >= 3.11.
+- Install from PyPI: `uvx log-ui` (run without installing), `uv tool install log-ui`, `uv run --with log-ui log-ui` or `pip install log-ui`. Python >= 3.11.
 - Run: `log-ui` serves `~/.cache/huggingface/trackio` at http://127.0.0.1:8765; `log-ui --dir PATH --project NAME --open` for another store.
 - log-ui never imports trackio and never writes to the store. All store access goes through `log_ui/contract.py`, which declares the tables (`configs`, `metrics`, `system_metrics`) and columns it reads and the supported trackio versions (`>=0.38,<0.40`). Connections are read-only and schema-checked; drift returns an `unsupported trackio store` error.
 - Docker: `docker run --rm -p 127.0.0.1:8765:8765 ghcr.io/aadityasalgarkar/log-ui` serves a bundled demo; add `-v ~/.cache/huggingface/trackio:/data:ro` to serve your own store read-only. Multi-arch (amd64, arm64), Alpine-based, runs as uid 10001; supports `--read-only --tmpfs /tmp --cap-drop ALL` (see `compose.yaml`). Provenance: `gh attestation verify oci://ghcr.io/aadityasalgarkar/log-ui:latest --owner AadityaSalgarkar`. Build from source instead: `docker build -t log-ui https://github.com/AadityaSalgarkar/log-ui.git`.

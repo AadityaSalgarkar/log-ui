@@ -106,8 +106,7 @@
       <h1>Your trackio runs, <span class="soft">charted like wandb.</span> On your machine.</h1>
       <p class="lede">log-ui is a read-only dashboard for experiments logged with <a href="https://github.com/gradio-app/trackio">trackio</a>. Point it at a store and compare runs: grouped charts, smoothing, spread bands, a runs table that shows which configs differ. One Python process, no accounts, no cloud.</p>
       <div class="cmd">
-        <pre id="install"><span class="c">$</span> uv tool install git+https://github.com/AadityaSalgarkar/log-ui
-<span class="c">$</span> log-ui --open</pre>
+        <pre id="install"><span class="c">$</span> uvx log-ui --open      <span class="c"># or: pip install log-ui</span></pre>
         <button type="button" id="copy" aria-label="Copy install commands">copy</button>
       </div>
       <p class="alt">Or try the demo in a sandbox: <code>docker run --rm -p 127.0.0.1:8765:8765 ghcr.io/aadityasalgarkar/log-ui</code>, read-only, as an unprivileged user on Alpine. <a href="#docker">Docker →</a></p>
@@ -214,7 +213,7 @@ docker build -t log-ui \
 </div>
 <script>
   document.getElementById("copy").addEventListener("click", async (e) => {
-    const text = "uv tool install git+https://github.com/AadityaSalgarkar/log-ui\nlog-ui --open"
+    const text = "uvx log-ui --open"
     try {
       await navigator.clipboard.writeText(text)
       e.target.textContent = "copied"

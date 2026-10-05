@@ -5,6 +5,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-05
+
+### Added
+
+- Published on PyPI: `uvx log-ui`, `uv tool install log-ui`, `uv run --with log-ui log-ui` or `pip install log-ui`.
+  Releases publish to PyPI from CI with trusted publishing (no stored token).
+
+### Changed
+
+- README links and the screenshot are absolute, so they render on PyPI; package metadata lists the author,
+  supported Python versions and categories.
+
 ## [0.3.0] - 2026-10-04
 
 ### Added
@@ -54,7 +66,8 @@ First release.
   non-root user, hardened `compose.yaml`, SBOM and signed build provenance.
 - `scripts/demo_store.py` to generate a synthetic trackio store; project site with `llms.txt`.
 
-[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AadityaSalgarkar/log-ui/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AadityaSalgarkar/log-ui/releases/tag/v0.1.0

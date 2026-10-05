@@ -1,7 +1,8 @@
 # log-ui
 
+[![PyPI](https://img.shields.io/pypi/v/log-ui.svg)](https://pypi.org/project/log-ui/)
 [![CI](https://github.com/AadityaSalgarkar/log-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/AadityaSalgarkar/log-ui/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/AadityaSalgarkar/log-ui/blob/main/LICENSE)
 
 A self-hosted, wandb-style dashboard for experiments logged with [trackio](https://github.com/gradio-app/trackio).
 One Python process serves a read-only JSON API over trackio's sqlite store and a prebuilt React app.
@@ -9,15 +10,19 @@ No Node at runtime, no accounts, no cloud.
 
 **Site:** <https://aadityasalgarkar.github.io/log-ui/> · **For LLMs:** [`llms.txt`](https://aadityasalgarkar.github.io/log-ui/llms.txt)
 
-![log-ui workspace: a learning-rate sweep with a mean ± std band on the training loss](docs/assets/workspace-light.jpg)
+![log-ui workspace: training and validation loss overlaid in key plots above grouped charts](https://raw.githubusercontent.com/AadityaSalgarkar/log-ui/main/docs/assets/workspace-light.jpg)
 
 ## Install and run
 
 ```
-uv tool install git+https://github.com/AadityaSalgarkar/log-ui    # or: pip install git+https://github.com/AadityaSalgarkar/log-ui
-log-ui                                                            # serves ~/.cache/huggingface/trackio at http://127.0.0.1:8765
-log-ui --dir /path/to/store --project my-project --open
+uvx log-ui                          # run it without installing; serves ~/.cache/huggingface/trackio at http://127.0.0.1:8765
+uvx log-ui --dir /path/to/store --project my-project --open
+
+uv tool install log-ui              # or install the `log-ui` command (pip install log-ui works too)
+uv run --with log-ui log-ui         # or run it from a throwaway environment next to your project
 ```
+
+The latest code from `main`: `uvx --from git+https://github.com/AadityaSalgarkar/log-ui log-ui`.
 
 No runs of your own yet? Write a synthetic store with a small learning-rate sweep and open it:
 
@@ -86,7 +91,7 @@ container can do, by construction:
 ## The trackio contract
 
 log-ui is read-only and does not import trackio. Its only I/O with trackio is the on-disk sqlite store, and
-all of that access lives in one module, [`log_ui/contract.py`](log_ui/contract.py), which declares:
+all of that access lives in one module, [`log_ui/contract.py`](https://github.com/AadityaSalgarkar/log-ui/blob/main/log_ui/contract.py), which declares:
 
 - the files it reads: `<store>/<project>.db` for canonical project names (`[A-Za-z0-9_-]+`), excluding
   trackio's `registry-*` databases;
@@ -137,7 +142,7 @@ group `log_ui.views` in your package, or pass `--views my_module:provide`. `runs
 config and summary, so a provider can derive categories from the config (datasets, species, seeds) and map
 them to metric keys with templates like `val/{category}/{metric}`. Panel types: `ladder` (one line per run
 across ordered categories), `heatmap` (runs × categories), `table`, `lines` (small multiples over steps) and
-`stats`. See [`log_ui/views.py`](log_ui/views.py) for the dataclasses.
+`stats`. See [`log_ui/views.py`](https://github.com/AadityaSalgarkar/log-ui/blob/main/log_ui/views.py) for the dataclasses.
 
 ## Development
 
@@ -154,18 +159,19 @@ npm run build                            # writes ../log_ui/static (committed, s
 ```
 
 The built app in `log_ui/static` is committed so that installing needs no Node; CI checks it matches the
-sources. The project site lives in [`docs/`](docs/) and is published with GitHub Pages.
+sources. The project site lives in [`docs/`](https://github.com/AadityaSalgarkar/log-ui/tree/main/docs) and is published with GitHub Pages.
 
 ## Versions
 
-Releases follow [semantic versioning](https://semver.org/); see [CHANGELOG.md](CHANGELOG.md) and
+Releases follow [semantic versioning](https://semver.org/); see [CHANGELOG.md](https://github.com/AadityaSalgarkar/log-ui/blob/main/CHANGELOG.md) and
 [GitHub Releases](https://github.com/AadityaSalgarkar/log-ui/releases). Pin a version with
-`uv tool install git+https://github.com/AadityaSalgarkar/log-ui@v0.3.0` or `ghcr.io/aadityasalgarkar/log-ui:0.3.0`
+`uvx log-ui@0.3.1`, `uv tool install log-ui==0.3.1` or `ghcr.io/aadityasalgarkar/log-ui:0.3.1`
 (`:0.3` follows the latest patch, `:latest` follows `main`).
 
 To release: set `__version__` in `log_ui/__init__.py`, move the `Unreleased` notes in `CHANGELOG.md` under the
 new version, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. CI checks the tag matches `__version__`,
-creates the GitHub Release with the wheel and sdist, and publishes the image.
+creates the GitHub Release with the wheel and sdist, publishes to PyPI (trusted publishing, no stored token)
+and publishes the image.
 
 ## Roadmap
 
@@ -174,4 +180,4 @@ report authoring.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](https://github.com/AadityaSalgarkar/log-ui/blob/main/LICENSE).
